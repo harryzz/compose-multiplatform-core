@@ -67,12 +67,11 @@ import org.jetbrains.skia.Surface
 import org.jetbrains.skiko.currentNanoTime
 
 @ExperimentalTestApi
-@Deprecated(
-    level = DeprecationLevel.HIDDEN,
-    message = "Replaced with same function, but with suspend block, runTextContext, testTimeout"
-)
-@JvmName("runComposeUiTest")
-fun runComposeUiTestNonSuspendingLambda(
+//@Deprecated(
+//    level = DeprecationLevel.HIDDEN,
+//    message = "Replaced with same function, but with suspend block, runTextContext, testTimeout"
+//)
+fun runComposeUiTest(
     effectContext: CoroutineContext = EmptyCoroutineContext,
     block: ComposeUiTest.() -> Unit
 ) {
@@ -80,6 +79,10 @@ fun runComposeUiTestNonSuspendingLambda(
 }
 
 @ExperimentalTestApi
+@Deprecated(
+    level = DeprecationLevel.HIDDEN,
+    message = "TODO: Adopt runComposeUiTest with suspend lambda"
+)
 actual fun runComposeUiTest(
     effectContext: CoroutineContext,
     runTestContext: CoroutineContext,
