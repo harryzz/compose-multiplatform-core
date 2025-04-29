@@ -16,7 +16,7 @@
 
 package androidx.compose.foundation.copyPasteAndroidTests
 
-import androidx.compose.foundation.AtomicLong
+import androidx.compose.foundation.internal.AtomicLong
 import androidx.compose.runtime.MonotonicFrameClock
 import kotlinx.coroutines.InternalCoroutinesApi
 import kotlinx.coroutines.internal.SynchronizedObject
