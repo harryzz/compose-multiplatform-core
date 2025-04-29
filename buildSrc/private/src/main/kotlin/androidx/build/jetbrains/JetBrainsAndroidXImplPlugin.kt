@@ -103,9 +103,10 @@ open class JetbrainsExtensions(
             c?.resolutionStrategy {
                 it.dependencySubstitution {
                     projectPathToRedirectingVersionMap.forEach { path, version ->
-                        val artifact = path.replaceFirst(":", "").let {
-                            "androidx.$it:$version"
-                        }
+                        val pathElements = path.split(":").filter { it.isNotEmpty() }
+                        val group = pathElements.dropLast(1).joinToString(".")
+                        val module = pathElements.last()
+                        val artifact = "androidx.$group:$module:$version"
                         it.substitute(it.project(path)).using(it.module(artifact))
                     }
                 }
