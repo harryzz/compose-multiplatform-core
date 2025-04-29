@@ -25,19 +25,18 @@ import androidx.compose.runtime.mock.ViewApplier
 import androidx.compose.runtime.mock.compositionTest
 import androidx.compose.runtime.mock.validate
 import androidx.compose.runtime.mock.view
-import androidx.compose.runtime.platform.SynchronizedObject
-import androidx.compose.runtime.platform.synchronized
+import androidx.compose.runtime.runTest
 import kotlin.coroutines.resume
-import kotlin.math.exp
 import kotlin.test.Ignore
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlinx.coroutines.CancellableContinuation
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlinx.coroutines.test.runTest
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @Stable
 class PausableCompositionTests {
     @Test
@@ -360,7 +359,7 @@ class PausableCompositionTests {
     }
 
     @Test
-    fun pausableComposition_throwInResume() = runTest(expect = IllegalStateException::class) {
+    fun pausableComposition_throwInResume() = runTest(expected = IllegalStateException::class) {
         val recomposer = Recomposer(coroutineContext)
         val pausableComposition = PausableComposition(EmptyApplier(), recomposer)
 
@@ -374,7 +373,8 @@ class PausableCompositionTests {
         }
     }
 
-    fun pausableComposition_throwInApply() = runTest(expect = IllegalStateException::class) {
+    @Test
+    fun pausableComposition_throwInApply() = runTest(expected = IllegalStateException::class) {
         val recomposer = Recomposer(coroutineContext)
         val pausableComposition = PausableComposition(EmptyApplier(), recomposer)
 
@@ -431,14 +431,11 @@ private var recorder: TestRecorder =
 
 private inline fun recordTest(block: () -> Unit): String {
     val result = mutableListOf<String>()
-    val lock = SynchronizedObject()
     val oldRecorder = recorder
     recorder =
         object : TestRecorder {
             override fun log(message: String) {
-                synchronized(lock) {
-                    result.add(message)
-                }
+                result.add(message)
             }
 
             override fun logs() = result.joinToString()

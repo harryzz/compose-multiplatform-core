@@ -34,7 +34,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
-import kotlinx.test.IgnoreJsTarget
 
 @Stable
 class CompositionReusingTests {
@@ -146,13 +145,13 @@ class CompositionReusingTests {
     @Test
     fun compositeHashCodeReflectsReusableChanges() = compositionTest {
         var key by mutableStateOf(0)
-        var lastCompositeHash = 0
+        var lastCompositeHash = EmptyCompositeKeyHashCode
 
         compose {
             ReusableContent(key) {
                 Linear {
                     Text("Key = $key")
-                    lastCompositeHash = currentCompositeKeyHash
+                    lastCompositeHash = currentCompositeKeyHashCode
                 }
             }
         }
@@ -170,13 +169,13 @@ class CompositionReusingTests {
     fun compositeHashCodeIsConsistent() = compositionTest {
         var key by mutableStateOf(0)
         var localValue by mutableStateOf(0)
-        var lastCompositeHash = 0
+        var lastCompositeHash = EmptyCompositeKeyHashCode
 
         compose {
             ReusableContent(key) {
                 Linear {
                     Text("Key = $key: $localValue")
-                    lastCompositeHash = currentCompositeKeyHash
+                    lastCompositeHash = currentCompositeKeyHashCode
                 }
             }
         }

@@ -82,7 +82,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collection.MutableVector
 import androidx.compose.runtime.collection.mutableVectorOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.movableContentOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -90,6 +92,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
@@ -3289,6 +3292,83 @@ class LookaheadScopeTest {
     }
 
     @Test
+    fun testReorderChildrenInLookaheadScope() {
+        val list = mutableStateListOf(1, 2)
+        data class Stats(
+            var lookaheadMeasurementCount: Int = 0,
+            var measurementCount: Int = 0,
+            var lookaheadPlacementCount: Int = 0,
+            var placementCount: Int = 0,
+        )
+        val boxStats = Stats()
+        val rowStats = Stats()
+        rule.setContent {
+            Row {
+                LookaheadScope {
+                    list.fastForEach {
+                        key(it) {
+                            if (it == 1) {
+                                Box(
+                                    Modifier.size(100.dp).layout { m, c ->
+                                        if (isLookingAhead) boxStats.lookaheadMeasurementCount++
+                                        else boxStats.measurementCount++
+                                        m.measure(c).run {
+                                            layout(width, height) {
+                                                if (isLookingAhead)
+                                                    boxStats.lookaheadPlacementCount++
+                                                else boxStats.placementCount++
+                                                place(0, 0)
+                                            }
+                                        }
+                                    }
+                                )
+                            } else {
+                                Row(
+                                    Modifier.size(200.dp).layout { m, c ->
+                                        if (isLookingAhead) rowStats.lookaheadMeasurementCount++
+                                        else rowStats.measurementCount++
+                                        m.measure(c).run {
+                                            layout(width, height) {
+                                                if (isLookingAhead)
+                                                    rowStats.lookaheadPlacementCount++
+                                                else rowStats.placementCount++
+                                                place(0, 0)
+                                            }
+                                        }
+                                    }
+                                ) {}
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        rule.runOnIdle {
+            assertEquals(1, boxStats.lookaheadMeasurementCount)
+            assertEquals(1, boxStats.lookaheadPlacementCount)
+            assertEquals(1, boxStats.measurementCount)
+            assertEquals(1, boxStats.placementCount)
+            assertEquals(1, rowStats.lookaheadMeasurementCount)
+            assertEquals(1, rowStats.lookaheadPlacementCount)
+            assertEquals(1, rowStats.measurementCount)
+            assertEquals(1, rowStats.placementCount)
+        }
+        list[0] = 2
+        list[1] = 1
+        rule.waitForIdle()
+        rule.runOnIdle {
+            assertEquals(2, boxStats.lookaheadMeasurementCount)
+            assertEquals(2, boxStats.lookaheadPlacementCount)
+            assertEquals(2, boxStats.measurementCount)
+            assertEquals(2, boxStats.placementCount)
+            assertEquals(2, rowStats.lookaheadMeasurementCount)
+            assertEquals(2, rowStats.lookaheadPlacementCount)
+            assertEquals(2, rowStats.measurementCount)
+            assertEquals(2, rowStats.placementCount)
+        }
+    }
+
+    @Test
     fun testSkipPlacementInLookahead() {
         var lookaheadMeasured = false
         var lookaheadPlaced = false
@@ -3302,6 +3382,73 @@ class LookaheadScopeTest {
             assertTrue(lookaheadMeasured)
             assertTrue(lookaheadPlaced)
         }
+    }
+
+    @Test
+    fun lookaheadRecomposesLayoutOnStaticLocalChange() {
+        val local = staticCompositionLocalOf { -1 }
+
+        var current = -1
+        var value by mutableIntStateOf(0)
+
+        val measurePolicy: SubcomposeMeasureScope.(Constraints) -> MeasureResult = { c ->
+            subcompose(Unit) {
+                    current = local.current
+                    Box(Modifier.size(100.dp, 100.dp))
+                }
+                .single()
+                .measure(c)
+            layout(0, 0) {}
+        }
+        rule.setContent {
+            LookaheadScope {
+                CompositionLocalProvider(local provides value) {
+                    SubcomposeLayout(measurePolicy = measurePolicy)
+                }
+            }
+        }
+
+        rule.runOnIdle {
+            assertEquals(0, current)
+            value = 1
+        }
+
+        rule.runOnIdle { assertEquals(1, current) }
+    }
+
+    @Test
+    fun onlyApproachRecomposesLayoutOnStaticLocalChange() {
+        val local = staticCompositionLocalOf { -1 }
+
+        var current = -1
+        var value by mutableIntStateOf(0)
+
+        rule.setContent {
+            LookaheadScope {
+                CompositionLocalProvider(local provides value) {
+                    SubcomposeLayout { c ->
+                        if (!isLookingAhead) {
+                            // Only run subcompose and emit a layout node in the approach pass,
+                            // to verify invalidation in the approach pass works correctly.
+                            subcompose(Unit) {
+                                    current = local.current
+                                    Box(Modifier.size(100.dp, 100.dp))
+                                }
+                                .single()
+                                .measure(c)
+                        }
+                        layout(0, 0) {}
+                    }
+                }
+            }
+        }
+
+        rule.runOnIdle {
+            assertEquals(0, current)
+            value = 1
+        }
+
+        rule.runOnIdle { assertEquals(1, current) }
     }
 
     @Composable

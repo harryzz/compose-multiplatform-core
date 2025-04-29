@@ -14,8 +14,11 @@
  * limitations under the License.
  */
 
+@file:OptIn(ExperimentalNativeApi::class)
+
 package androidx.compose.foundation.text
 
+import kotlin.experimental.ExperimentalNativeApi
 import kotlin.math.absoluteValue
 import kotlin.math.sign
 import org.jetbrains.skia.BreakIterator
@@ -261,4 +264,12 @@ private fun CodePoint.isPunctuation(): Boolean {
         CharCategory.FINAL_QUOTE_PUNCTUATION
     )
     return punctuationSet.any { it.contains(this.toChar()) }
+}
+
+internal actual fun String.findCodePointOrEmojiStartBefore(
+    index: Int,
+    ifNotFound: Int
+): Int {
+    // TODO https://github.com/JetBrains/compose-multiplatform-core/pull/1869
+    return index
 }

@@ -25,6 +25,7 @@ import androidx.compose.material3.internal.getString
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -40,12 +41,12 @@ internal fun DateRangeInputContent(
     yearRange: IntRange,
     dateFormatter: DatePickerFormatter,
     selectableDates: SelectableDates,
-    colors: DatePickerColors
+    colors: DatePickerColors,
+    focusRequester: FocusRequester?
 ) {
     // Obtain the DateInputFormat for the default Locale.
-    val defaultLocale = defaultLocale()
     val dateInputFormat =
-        remember(defaultLocale) { calendarModel.getDateInputFormat(defaultLocale) }
+        remember(calendarModel.locale) { calendarModel.getDateInputFormat(calendarModel.locale) }
     val errorDatePattern = getString(Strings.DateInputInvalidForPattern)
     val errorDateOutOfYearRange = getString(Strings.DateInputInvalidYearRange)
     val errorInvalidNotAllowed = getString(Strings.DateInputInvalidNotAllowed)
@@ -93,8 +94,9 @@ internal fun DateRangeInputContent(
             inputIdentifier = InputIdentifier.StartDateInput,
             dateInputValidator = dateInputValidator,
             dateInputFormat = dateInputFormat,
-            locale = defaultLocale,
-            colors = colors
+            locale = calendarModel.locale,
+            colors = colors,
+            focusRequester = focusRequester
         )
         val endRangeText = getString(string = Strings.DateRangePickerEndHeadline)
         DateInputTextField(
@@ -115,8 +117,11 @@ internal fun DateRangeInputContent(
             inputIdentifier = InputIdentifier.EndDateInput,
             dateInputValidator = dateInputValidator,
             dateInputFormat = dateInputFormat,
-            locale = defaultLocale,
-            colors = colors
+            locale = calendarModel.locale,
+            colors = colors,
+            // Setting null to the second field, as only one input field should request focus by
+            // default and a possible non-null requester was passed to the first field.
+            focusRequester = null
         )
     }
 }

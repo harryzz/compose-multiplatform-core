@@ -20,6 +20,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.ui.autofill.ContentDataType
 import androidx.compose.ui.autofill.ContentType
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextLayoutResult
@@ -255,6 +256,17 @@ object SemanticsProperties {
 
     /** @see SemanticsPropertyReceiver.maxTextLength */
     val MaxTextLength = SemanticsPropertyKey<Int>("MaxTextLength")
+
+    /** @see SemanticsPropertyReceiver.shape */
+    val Shape =
+        SemanticsPropertyKey<Shape>(
+            name = "Shape",
+            isImportantForAccessibility = false,
+            mergePolicy = { parentValue, _ ->
+                // Never merge shapes
+                parentValue
+            }
+        )
 }
 
 /**
@@ -452,6 +464,18 @@ private fun <T> throwSemanticsGetNotSupported(): T {
     )
 }
 
+@Suppress("NOTHING_TO_INLINE")
+// inline to avoid different static initialization order on different targets.
+// See https://youtrack.jetbrains.com/issue/KT-65040 for more information.
+internal inline fun <T> AccessibilityKey(name: String) =
+    SemanticsPropertyKey<T>(name = name, isImportantForAccessibility = true)
+
+@Suppress("NOTHING_TO_INLINE")
+// inline to avoid different static initialization order on different targets
+// See https://youtrack.jetbrains.com/issue/KT-65040 for more information.
+internal inline fun <T> AccessibilityKey(name: String, noinline mergePolicy: (T?, T) -> T?) =
+    SemanticsPropertyKey(name = name, isImportantForAccessibility = true, mergePolicy = mergePolicy)
+
 /**
  * Standard accessibility action.
  *
@@ -484,6 +508,19 @@ class AccessibilityAction<T : Function<Boolean>>(val label: String?, val action:
         return "AccessibilityAction(label=$label, action=$action)"
     }
 }
+
+@Suppress("NOTHING_TO_INLINE")
+// inline to break static initialization cycle issue
+private inline fun <T : Function<Boolean>> ActionPropertyKey(name: String) =
+    AccessibilityKey<AccessibilityAction<T>>(
+        name = name,
+        mergePolicy = { parentValue, childValue ->
+            AccessibilityAction(
+                parentValue?.label ?: childValue.label,
+                parentValue?.action ?: childValue.action
+            )
+        }
+    )
 
 /**
  * Custom accessibility action.
@@ -1094,6 +1131,9 @@ fun SemanticsPropertyReceiver.indexForKey(mapping: (Any) -> Int) {
  */
 var SemanticsPropertyReceiver.maxTextLength by SemanticsProperties.MaxTextLength
 
+/** The shape of the UI element if it's different from the bounding rectangle. */
+var SemanticsPropertyReceiver.shape by SemanticsProperties.Shape
+
 /**
  * The node is marked as a collection of horizontally or vertically stacked selectable elements.
  *
@@ -1190,7 +1230,7 @@ fun SemanticsPropertyReceiver.scrollToIndex(label: String? = null, action: (Int)
 /**
  * Action to autofill a TextField.
  *
- * Expected to be used in conjunction with contentType and contentDataType properties.
+ * Expected to be used in conjunction with [contentType] and [contentDataType] properties.
  *
  * @param label Optional label for this action.
  * @param action Action to be performed when the [SemanticsActions.OnAutofillText] is called.

@@ -39,6 +39,7 @@ import android.widget.TextView
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -84,7 +85,6 @@ import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.platform.LocalSavedStateRegistryOwner
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.platform.findViewTreeCompositionContext
@@ -131,6 +131,7 @@ import androidx.lifecycle.findViewTreeLifecycleOwner
 import androidx.lifecycle.testing.TestLifecycleOwner
 import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryOwner
+import androidx.savedstate.compose.LocalSavedStateRegistryOwner
 import androidx.savedstate.findViewTreeSavedStateRegistryOwner
 import androidx.test.espresso.Espresso
 import androidx.test.espresso.Espresso.onView
@@ -2217,6 +2218,69 @@ class AndroidViewTest {
                     .isGreaterThan(0)
             }
         }
+    }
+
+    @Test
+    fun asNestedMovableContentChild() {
+        var useRowContainer by mutableStateOf(false)
+
+        @Composable
+        fun MovableContentContainer(content: @Composable () -> Unit) {
+            val movableContent = remember(content) { movableContentOf(content) }
+            if (useRowContainer) {
+                Row { movableContent() }
+            } else {
+                Column { movableContent() }
+            }
+        }
+
+        rule.setContent {
+            MovableContentContainer {
+                MovableContentContainer {
+                    AndroidView(
+                        factory = { context ->
+                            View(context).apply { layoutParams = ViewGroup.LayoutParams(100, 100) }
+                        }
+                    )
+                }
+            }
+        }
+
+        rule.waitForIdle()
+        useRowContainer = true
+        rule.waitForIdle()
+    }
+
+    @Test
+    fun asNestedMovableContentChildWithReuse() {
+        var useRowContainer by mutableStateOf(false)
+
+        @Composable
+        fun MovableContentContainer(content: @Composable () -> Unit) {
+            val movableContent = remember(content) { movableContentOf(content) }
+            if (useRowContainer) {
+                Row { movableContent() }
+            } else {
+                Column { movableContent() }
+            }
+        }
+
+        rule.setContent {
+            MovableContentContainer {
+                MovableContentContainer {
+                    AndroidView(
+                        factory = { context ->
+                            View(context).apply { layoutParams = ViewGroup.LayoutParams(100, 100) }
+                        },
+                        onReset = { _ -> }
+                    )
+                }
+            }
+        }
+
+        rule.waitForIdle()
+        useRowContainer = true
+        rule.waitForIdle()
     }
 
     @Composable

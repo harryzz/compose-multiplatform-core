@@ -15,7 +15,6 @@
  */
 package androidx.compose.ui.test
 
-import androidx.compose.runtime.InternalComposeApi
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.node.RootForTest
@@ -74,7 +73,6 @@ internal expect fun createInputDispatcher(
  * benefit of any interop Android views inside Compose, which expect an Android-native model of the
  * event stream.
  */
-@OptIn(InternalComposeApi::class)
 internal abstract class InputDispatcher(
     private val testContext: TestContext,
     private val root: RootForTest,

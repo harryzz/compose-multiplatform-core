@@ -18,6 +18,8 @@
 
 package androidx.compose.foundation.text
 
+import androidx.compose.foundation.ComposeFoundationFlags
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.Interaction
@@ -39,10 +41,9 @@ import androidx.compose.foundation.text.selection.SelectionHandleInfoKey
 import androidx.compose.foundation.text.selection.SimpleLayout
 import androidx.compose.foundation.text.selection.TextFieldSelectionHandle
 import androidx.compose.foundation.text.selection.TextFieldSelectionManager
+import androidx.compose.foundation.text.selection.addBasicTextFieldTextContextMenuComponents
 import androidx.compose.foundation.text.selection.isSelectionHandleInVisibleBound
-import androidx.compose.foundation.text.selection.selectionGestureInput
 import androidx.compose.foundation.text.selection.textFieldMagnifier
-import androidx.compose.foundation.text.selection.updateSelectionTouchMode
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.DontMemoize
@@ -70,7 +71,6 @@ import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.FirstBaseline
 import androidx.compose.ui.layout.IntrinsicMeasurable
@@ -114,6 +114,7 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastRoundToInt
 import kotlin.math.max
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
@@ -298,7 +299,7 @@ internal fun CoreTextField(
     manager.editable = !readOnly
     manager.enabled = enabled
 
-    // TODO: upstreaming https://youtrack.jetbrains.com/issue/CMP-7517/Upstream-rememberClipboardEventsHandler
+    // TODO: Upstreaming https://youtrack.jetbrains.com/issue/CMP-7517
     rememberClipboardEventsHandler(
         isEnabled = state.hasFocus,
         onCopy = { manager.onCopyWithResult() },
@@ -525,6 +526,7 @@ internal fun CoreTextField(
             .then(pointerModifier)
             .then(semanticsModifier)
             .onGloballyPositioned @DontMemoize { state.layoutResult?.decorationBoxCoordinates = it }
+            .addContextMenuComponents(manager, coroutineScope)
 
     val showHandleAndMagnifier =
         enabled && state.hasFocus && state.isInTouchMode && windowInfo.isWindowFocused
@@ -864,6 +866,9 @@ internal class LegacyTextFieldState(
     val onImeActionPerformed: (ImeAction) -> Unit = { imeAction ->
         keyboardActionRunner.runAction(imeAction)
     }
+    val onImeActionPerformedWithResult: (ImeAction) -> Boolean = { imeAction ->
+        keyboardActionRunner.runAction(imeAction)
+    }
 
     /** The paint used to draw highlight backgrounds. */
     val highlightPaint: Paint = Paint()
@@ -1110,3 +1115,12 @@ private fun notifyFocusedRect(
         )
     }
 }
+
+@OptIn(ExperimentalFoundationApi::class)
+private fun Modifier.addContextMenuComponents(
+    textFieldSelectionManager: TextFieldSelectionManager,
+    coroutineScope: CoroutineScope
+): Modifier =
+    if (ComposeFoundationFlags.isNewContextMenuEnabled)
+        addBasicTextFieldTextContextMenuComponents(textFieldSelectionManager, coroutineScope)
+    else this
