@@ -98,8 +98,8 @@ if(AndroidXComposePlugin.isMultiplatformEnabled(project)) {
             commonMain.dependencies {
                 implementation(libs.kotlinStdlib)
                 implementation(project(":collection:collection"))
-
-                api project(":compose:runtime:runtime")
+                api(project(":compose:runtime:runtime"))
+                api(project(":savedstate:savedstate-compose"))
             }
 
             androidMain.dependencies {

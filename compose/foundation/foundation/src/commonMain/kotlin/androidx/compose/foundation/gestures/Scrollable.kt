@@ -21,16 +21,16 @@ import androidx.compose.animation.core.DecayAnimationSpec
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateDecay
 import androidx.compose.animation.splineBasedDecay
-import androidx.compose.foundation.ComposeFoundationFlags.NewNestedFlingPropagationEnabled
+import androidx.compose.foundation.ComposeFoundationFlags.isOnScrollChangedCallbackEnabled
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.FocusedBoundsObserverNode
 import androidx.compose.foundation.LocalOverscrollFactory
 import androidx.compose.foundation.MutatePriority
 import androidx.compose.foundation.OverscrollEffect
-import androidx.compose.foundation.PlatformOptimizedCancellationException
 import androidx.compose.foundation.gestures.Orientation.Horizontal
 import androidx.compose.foundation.gestures.Orientation.Vertical
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.internal.PlatformOptimizedCancellationException
 import androidx.compose.foundation.relocation.BringIntoViewResponderNode
 import androidx.compose.foundation.rememberOverscrollEffect
 import androidx.compose.foundation.rememberPlatformOverscrollEffect
@@ -64,6 +64,7 @@ import androidx.compose.ui.node.DelegatableNode
 import androidx.compose.ui.node.ModifierNodeElement
 import androidx.compose.ui.node.SemanticsModifierNode
 import androidx.compose.ui.node.TraversableNode
+import androidx.compose.ui.node.dispatchOnScrollChanged
 import androidx.compose.ui.node.invalidateSemantics
 import androidx.compose.ui.node.requireDensity
 import androidx.compose.ui.platform.InspectorInfo
@@ -79,7 +80,6 @@ import androidx.compose.ui.util.fastAny
 import kotlin.math.abs
 import kotlin.math.absoluteValue
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -276,7 +276,8 @@ internal class ScrollableNode(
     ),
     KeyInputModifierNode,
     SemanticsModifierNode,
-    CompositionLocalConsumerModifierNode {
+    CompositionLocalConsumerModifierNode,
+    OnScrollChangedDispatcher {
 
     override val shouldAutoInvalidate: Boolean = false
 
@@ -295,6 +296,7 @@ internal class ScrollableNode(
             reverseDirection = reverseDirection,
             flingBehavior = flingBehavior ?: defaultFlingBehavior,
             nestedScrollDispatcher = nestedScrollDispatcher,
+            onScrollChangedDispatcher = this,
             isScrollableNodeAttached = { isAttached }
         )
 
@@ -319,6 +321,11 @@ internal class ScrollableNode(
         delegate(FocusTargetModifierNode(focusability = Focusability.Never))
         delegate(BringIntoViewResponderNode(contentInViewNode))
         delegate(FocusedBoundsObserverNode { contentInViewNode.onFocusBoundsChanged(it) })
+    }
+
+    override fun dispatchScrollDeltaInfo(delta: Offset) {
+        if (!isAttached) return
+        dispatchOnScrollChanged(delta)
     }
 
     override suspend fun drag(
@@ -615,11 +622,9 @@ internal interface ScrollConfig {
 internal expect fun CompositionLocalConsumerModifierNode.platformScrollConfig(): ScrollConfig
 
 // TODO: provide public way to drag by mouse (especially requested for Pager)
-private val CanDragCalculation: (PointerInputChange) -> Boolean = { change ->
+internal val CanDragCalculation: (PointerInputChange) -> Boolean = { change ->
     change.type != PointerType.Mouse
 }
-
-private val NoOpOnDragStarted: suspend CoroutineScope.(startedPosition: Offset) -> Unit = {}
 
 /**
  * Holds all scrolling related logic: controls nested scrolling, flinging, overscroll and delta
@@ -632,10 +637,11 @@ internal class ScrollingLogic(
     private var orientation: Orientation,
     private var reverseDirection: Boolean,
     private var nestedScrollDispatcher: NestedScrollDispatcher,
+    private var onScrollChangedDispatcher: OnScrollChangedDispatcher,
     private val isScrollableNodeAttached: () -> Boolean
-) {
+) : ScrollLogic {
     // specifies if this scrollable node is currently flinging
-    var isFlinging = false
+    override var isFlinging = false
         private set
 
     fun Float.toOffset(): Offset =
@@ -696,6 +702,7 @@ internal class ScrollingLogic(
         with(outerStateScope) { performScroll(delta, latestScrollSource) }
     }
 
+    @OptIn(ExperimentalFoundationApi::class)
     private fun ScrollScope.performScroll(delta: Offset, source: NestedScrollSource): Offset {
         val consumedByPreScroll = nestedScrollDispatcher.dispatchPreScroll(delta, source)
 
@@ -707,6 +714,11 @@ internal class ScrollingLogic(
         // Consume on a single axis.
         val consumedBySelfScroll =
             scrollBy(singleAxisDeltaForSelfScroll).toOffset().reverseIfNeeded()
+
+        // Trigger on scroll changed callback
+        if (isOnScrollChangedCallbackEnabled) {
+            onScrollChangedDispatcher.dispatchScrollDeltaInfo(consumedBySelfScroll)
+        }
 
         val deltaAvailableAfterScroll = scrollAvailableAfterPreScroll - consumedBySelfScroll
         val consumedByPostScroll =
@@ -721,7 +733,7 @@ internal class ScrollingLogic(
     private val shouldDispatchOverscroll
         get() = scrollableState.canScrollForward || scrollableState.canScrollBackward
 
-    fun performRawScroll(scroll: Offset): Offset {
+    override fun performRawScroll(scroll: Offset): Offset {
         return if (scrollableState.isScrollInProgress) {
             Offset.Zero
         } else {
@@ -745,7 +757,9 @@ internal class ScrollingLogic(
         val performFling: suspend (Velocity) -> Velocity = { velocity ->
             val preConsumedByParent = nestedScrollDispatcher.dispatchPreFling(velocity)
             val available = velocity - preConsumedByParent
+
             val velocityLeft = doFlingAnimation(available)
+
             val consumedPost =
                 nestedScrollDispatcher.dispatchPostFling((available - velocityLeft), velocityLeft)
             val totalLeft = velocityLeft - consumedPost
@@ -772,47 +786,51 @@ internal class ScrollingLogic(
     }
 
     @OptIn(ExperimentalFoundationApi::class)
-    suspend fun doFlingAnimation(available: Velocity): Velocity {
+    override suspend fun doFlingAnimation(available: Velocity): Velocity {
         var result: Velocity = available
         isFlinging = true
-        scroll(scrollPriority = MutatePriority.Default) {
-            val nestedScrollScope = this
-            val reverseScope =
-                object : ScrollScope {
-                    override fun scrollBy(pixels: Float): Float {
-                        // Fling has hit the bounds or node left composition,
-                        // cancel it to allow continuation. This will conclude this node's fling,
-                        // allowing the onPostFling signal to be called
-                        // with the leftover velocity from the fling animation. Any nested scroll
-                        // node above will be able to pick up the left over velocity and continue
-                        // the fling.
-                        if (
-                            NewNestedFlingPropagationEnabled &&
-                                pixels.absoluteValue != 0.0f &&
-                                shouldCancelFling(pixels)
-                        ) {
-                            throw FlingCancellationException()
-                        }
+        try {
+            scroll(scrollPriority = MutatePriority.Default) {
+                val nestedScrollScope = this
+                val reverseScope =
+                    object : ScrollScope {
+                        override fun scrollBy(pixels: Float): Float {
+                            // Fling has hit the bounds or node left composition,
+                            // cancel it to allow continuation. This will conclude this node's
+                            // fling,
+                            // allowing the onPostFling signal to be called
+                            // with the leftover velocity from the fling animation. Any nested
+                            // scroll
+                            // node above will be able to pick up the left over velocity and
+                            // continue
+                            // the fling.
+                            if (pixels.absoluteValue != 0.0f && shouldCancelFling(pixels)) {
+                                throw FlingCancellationException()
+                            }
 
-                        return nestedScrollScope
-                            .scrollByWithOverscroll(
-                                offset = pixels.toOffset().reverseIfNeeded(),
-                                source = SideEffect
+                            return nestedScrollScope
+                                .scrollByWithOverscroll(
+                                    offset = pixels.toOffset().reverseIfNeeded(),
+                                    source = SideEffect
+                                )
+                                .toFloat()
+                                .reverseIfNeeded()
+                        }
+                    }
+                with(reverseScope) {
+                    with(flingBehavior) {
+                        result =
+                            result.update(
+                                performFling(available.toFloat().reverseIfNeeded())
+                                    .reverseIfNeeded()
                             )
-                            .toFloat()
-                            .reverseIfNeeded()
                     }
                 }
-            with(reverseScope) {
-                with(flingBehavior) {
-                    result =
-                        result.update(
-                            performFling(available.toFloat().reverseIfNeeded()).reverseIfNeeded()
-                        )
-                }
             }
+        } finally {
+            isFlinging = false
         }
-        isFlinging = false
+
         return result
     }
 
@@ -867,8 +885,8 @@ private val NoOpScrollScope: ScrollScope =
         override fun scrollBy(pixels: Float): Float = pixels
     }
 
-private class ScrollableNestedScrollConnection(
-    val scrollingLogic: ScrollingLogic,
+internal class ScrollableNestedScrollConnection(
+    val scrollingLogic: ScrollLogic,
     var enabled: Boolean
 ) : NestedScrollConnection {
 
@@ -887,12 +905,8 @@ private class ScrollableNestedScrollConnection(
     override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
         return if (enabled) {
             val velocityLeft =
-                if (NewNestedFlingPropagationEnabled) {
-                    if (scrollingLogic.isFlinging) {
-                        Velocity.Zero
-                    } else {
-                        scrollingLogic.doFlingAnimation(available)
-                    }
+                if (scrollingLogic.isFlinging) {
+                    Velocity.Zero
                 } else {
                     scrollingLogic.doFlingAnimation(available)
                 }
@@ -901,6 +915,15 @@ private class ScrollableNestedScrollConnection(
             Velocity.Zero
         }
     }
+}
+
+/** Interface to allow re-use across Scrollable and Scrollable2D. */
+internal interface ScrollLogic {
+    val isFlinging: Boolean
+
+    fun performRawScroll(scroll: Offset): Offset
+
+    suspend fun doFlingAnimation(available: Velocity): Velocity
 }
 
 /** Compatibility interface for default fling behaviors that depends on [Density]. */
@@ -1039,6 +1062,9 @@ private suspend fun ScrollingLogic.semanticsScrollBy(offset: Offset): Offset {
     return previousValue.toOffset()
 }
 
-internal class FlingCancellationException() : PlatformOptimizedCancellationException(
-    message = "The fling animation was cancelled"
-)
+internal class FlingCancellationException :
+    PlatformOptimizedCancellationException("The fling animation was cancelled")
+
+internal interface OnScrollChangedDispatcher {
+    fun dispatchScrollDeltaInfo(delta: Offset)
+}

@@ -293,6 +293,7 @@ public final class androidx/compose/foundation/layout/PaddingKt {
 }
 
 public abstract interface class androidx/compose/foundation/layout/PaddingValues {
+	public static final field Companion Landroidx/compose/foundation/layout/PaddingValues$Companion;
 	public abstract fun calculateBottomPadding-D9Ej5fM ()F
 	public abstract fun calculateLeftPadding-u2uoSUM (Landroidx/compose/ui/unit/LayoutDirection;)F
 	public abstract fun calculateRightPadding-u2uoSUM (Landroidx/compose/ui/unit/LayoutDirection;)F
@@ -312,6 +313,10 @@ public final class androidx/compose/foundation/layout/PaddingValues$Absolute : a
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class androidx/compose/foundation/layout/PaddingValues$Companion {
+	public final fun getZero ()Landroidx/compose/foundation/layout/PaddingValues;
+}
+
 public final class androidx/compose/foundation/layout/RowKt {
 	public static final fun Row (Landroidx/compose/ui/Modifier;Landroidx/compose/foundation/layout/Arrangement$Horizontal;Landroidx/compose/ui/Alignment$Vertical;Lkotlin/jvm/functions/Function3;Landroidx/compose/runtime/Composer;II)V
 	public static final fun getDefaultRowMeasurePolicy ()Landroidx/compose/ui/layout/MeasurePolicy;
@@ -329,6 +334,11 @@ public abstract interface class androidx/compose/foundation/layout/RowScope {
 
 public final class androidx/compose/foundation/layout/RowScope$DefaultImpls {
 	public static synthetic fun weight$default (Landroidx/compose/foundation/layout/RowScope;Landroidx/compose/ui/Modifier;FZILjava/lang/Object;)Landroidx/compose/ui/Modifier;
+}
+
+public final class androidx/compose/foundation/layout/RulerAlignmentKt {
+	public static final fun fitInside (Landroidx/compose/ui/Modifier;Landroidx/compose/ui/layout/RectRulers;)Landroidx/compose/ui/Modifier;
+	public static final fun fitOutside (Landroidx/compose/ui/Modifier;Landroidx/compose/ui/layout/RectRulers;)Landroidx/compose/ui/Modifier;
 }
 
 public final class androidx/compose/foundation/layout/SizeKt {
@@ -386,6 +396,7 @@ public final class androidx/compose/foundation/layout/WindowInsets$Companion {
 }
 
 public final class androidx/compose/foundation/layout/WindowInsetsKt {
+	public static final fun WindowInsets ()Landroidx/compose/foundation/layout/WindowInsets;
 	public static final fun WindowInsets (IIII)Landroidx/compose/foundation/layout/WindowInsets;
 	public static synthetic fun WindowInsets$default (IIIIILjava/lang/Object;)Landroidx/compose/foundation/layout/WindowInsets;
 	public static final fun WindowInsets-a9UjIt4 (FFFF)Landroidx/compose/foundation/layout/WindowInsets;

@@ -35,7 +35,8 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.test.IgnoreJsTarget
-import kotlinx.test.IgnoreJsAndNative
+import kotlinx.test.IgnoreNativeTarget
+import kotlinx.test.IgnoreWasmTarget
 
 class SnapshotStateMapTests {
     @Test
@@ -136,7 +137,9 @@ class SnapshotStateMapTests {
     }
 
     @Test
-    @IgnoreJsAndNative
+    @IgnoreJsTarget
+    @IgnoreWasmTarget
+    @IgnoreNativeTarget
     // Ignored on js and native:
     // test passes if the order is changed to
     // assertEquals(entries.first, entries.second)
@@ -387,7 +390,10 @@ class SnapshotStateMapTests {
         }
     }
 
-    @Test @IgnoreJsAndNative
+    @Test
+    @IgnoreJsTarget
+    @IgnoreWasmTarget
+    @IgnoreNativeTarget
     // Ignored for native:
     // SnapshotStateMap removes a correct element (same as on jvm and js) - entry(key=1,value=1f)
     // The test fails because MutableMap (normalMap) removes entry(key=1, value=5f)

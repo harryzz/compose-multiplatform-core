@@ -46,8 +46,7 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * <a href="https://m3.material.io/components/snackbar/overview" class="external"
- * target="_blank">Material Design snackbar</a>.
+ * [Material Design snackbar](https://m3.material.io/components/snackbar/overview)
  *
  * Snackbars provide brief messages about app processes at the bottom of the screen.
  *
@@ -77,7 +76,6 @@ import kotlin.math.min
  * For a multiline sample following the Material recommended spec of a maximum of 2 lines, see:
  *
  * @sample androidx.compose.material3.samples.ScaffoldWithMultilineSnackbar
- *
  * @param modifier the [Modifier] to be applied to this snackbar
  * @param action action / button component to add as an action to the snackbar. Consider using
  *   [ColorScheme.inversePrimary] as the color for the action, if you do not have a predefined color
@@ -146,8 +144,7 @@ fun Snackbar(
 }
 
 /**
- * <a href="https://m3.material.io/components/snackbar/overview" class="external"
- * target="_blank">Material Design snackbar</a>.
+ * [Material Design snackbar](https://m3.material.io/components/snackbar/overview)
  *
  * Snackbars provide brief messages about app processes at the bottom of the screen.
  *
@@ -182,7 +179,6 @@ fun Snackbar(
  * [SnackbarVisuals.withDismissAction]:
  *
  * @sample androidx.compose.material3.samples.ScaffoldWithIndefiniteSnackbar
- *
  * @param snackbarData data about the current snackbar showing via [SnackbarHostState]
  * @param modifier the [Modifier] to be applied to this snackbar
  * @param actionOnNewLine whether or not action should be put on a separate line. Recommended for

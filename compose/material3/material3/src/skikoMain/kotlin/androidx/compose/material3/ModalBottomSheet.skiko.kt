@@ -39,8 +39,7 @@ actual constructor(
     }
 
     override fun hashCode(): Int {
-        var result = shouldDismissOnBackPress.hashCode()
-        return result
+        return shouldDismissOnBackPress.hashCode()
     }
 }
 
@@ -54,6 +53,7 @@ actual object ModalBottomSheetDefaults {
 @Composable
 internal actual fun ModalBottomSheetDialog(
     onDismissRequest: () -> Unit,
+    contentColor: Color, // TODO: https://youtrack.jetbrains.com/issue/CMP-7147
     properties: ModalBottomSheetProperties,
     predictiveBackProgress: Animatable<Float, AnimationVector1D>,
     content: @Composable () -> Unit

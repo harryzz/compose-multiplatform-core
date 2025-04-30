@@ -30,6 +30,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -42,6 +43,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.foundation.layout.requiredSizeIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
@@ -80,9 +82,11 @@ import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.ScaleFactor
 import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.layout.approachLayout
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -2705,6 +2709,130 @@ class SharedTransitionTest {
     }
 
     @Test
+    fun testNoAdditionalPlacementWhenNoMatch() {
+        val state = LazyListState()
+        val placementCount = Array(20) { 0 }
+        val controlState = LazyListState()
+        val controlPlacementCount = Array(20) { 0 }
+        rule.setContent {
+            Row {
+                CompositionLocalProvider(LocalDensity provides Density(1f)) {
+                    AnimatedVisibility(true) {
+                        SharedTransitionLayout {
+                            LazyColumn(Modifier.size(100.dp), state) {
+                                repeat(20) { id ->
+                                    item(id) {
+                                        Box(
+                                            Modifier.sharedElement(
+                                                    rememberSharedContentState("$id"),
+                                                    this@AnimatedVisibility
+                                                )
+                                                .onPlaced { placementCount[id]++ }
+                                                .size(10.dp)
+                                                .background(Color.Black)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    LazyColumn(Modifier.size(100.dp), controlState) {
+                        repeat(20) { id ->
+                            item(id) {
+                                Box(
+                                    Modifier.onPlaced { controlPlacementCount[id]++ }
+                                        .size(10.dp)
+                                        .background(Color.Black)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        rule.runOnIdle {
+            repeat(20) {
+                runBlocking {
+                    state.scrollBy(5f)
+                    controlState.scrollBy(5f)
+                }
+            }
+        }
+        rule.runOnIdle {
+            repeat(20) { assertEquals(controlPlacementCount[it], placementCount[it]) }
+        }
+    }
+
+    // Verify that lookahead placement is not affected when skipToLookahead is used (indirectly
+    // via sharedBounds) by child returning a different size than
+    // parent when measured with the same lookahead constraints.
+    @Test
+    fun testLookaheadPositionInSkipToLookaheadSize() {
+        var target by mutableStateOf(true)
+        var targetPos: MutableList<Offset?> = mutableListOf()
+        var scope: SharedTransitionScope? = null
+        rule.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(1f)) {
+                SharedTransitionLayout(Modifier) {
+                    scope = this@SharedTransitionLayout
+                    AnimatedContent(
+                        target,
+                        transitionSpec = { EnterTransition.None togetherWith ExitTransition.None }
+                    ) { state ->
+                        Box(
+                            Modifier.requiredSizeIn(maxWidth = 400.dp, maxHeight = 400.dp)
+                                .sharedBounds(
+                                    rememberSharedContentState("test"),
+                                    animatedVisibilityScope = this@AnimatedContent
+                                )
+                                .layout { m, c ->
+                                    m.measure(c).run {
+                                        val w = if (isLookingAhead) width else 200
+                                        val h = if (isLookingAhead) height else 300
+                                        layout(w, h) {
+                                            if (
+                                                isLookingAhead && state == target && target == false
+                                            ) {
+                                                // Check that in spite of returning a different
+                                                // size in approach, it doesn't affect the
+                                                // lookahead placement.
+                                                targetPos.add(
+                                                    0,
+                                                    coordinates?.let { it.positionInParent() }
+                                                )
+                                            }
+                                            place(0, 0)
+                                        }
+                                    }
+                                }
+                                .background(Color.Red)
+                        ) {
+                            Box(Modifier.fillMaxSize().background(Color.Black))
+                        }
+                    }
+                }
+            }
+        }
+
+        rule.waitForIdle()
+        rule.mainClock.autoAdvance = false
+        target = !target
+        rule.mainClock.advanceTimeByFrame()
+        rule.waitForIdle()
+        rule.mainClock.advanceTimeByFrame()
+        rule.waitForIdle()
+
+        assertTrue(scope?.isTransitionActive!!)
+        targetPos.forEach {
+            if (it != null) {
+                assertEquals(Offset.Zero, it)
+            }
+        }
+    }
+
+    @Test
     fun testScaleToBoundsCaching() {
         val alignments =
             listOf(
@@ -2764,6 +2892,69 @@ class SharedTransitionTest {
             ScaleToBounds(alignment = customAlignment) ===
                 ScaleToBounds(alignment = customAlignment)
         )
+    }
+
+    @SdkSuppress(minSdkVersion = 26)
+    @Test
+    fun testSharedElementsDroppedFromOverlayAfterTransition() {
+        // Test that shared elements are dropped from overlay after transition **even if their
+        // match is still in the tree**.
+        val duration = 500
+        var showOverlay by mutableStateOf(false)
+        rule.setContent {
+            SharedTransitionLayout(Modifier.requiredSize(120.dp).testTag("root")) {
+                Box(
+                    modifier =
+                        Modifier.sharedElementWithCallerManagedVisibility(
+                                sharedContentState = rememberSharedContentState("box"),
+                                visible = !showOverlay,
+                                boundsTransform = BoundsTransform { _, _ -> tween(duration) }
+                            )
+                            .background(Color.LightGray)
+                            .fillMaxSize(),
+                )
+                Box(
+                    modifier =
+                        Modifier.sharedElementWithCallerManagedVisibility(
+                                sharedContentState = rememberSharedContentState("box"),
+                                visible = showOverlay,
+                                boundsTransform = BoundsTransform { _, _ -> tween(duration) }
+                            )
+                            .background(Color.LightGray)
+                            .size(110.dp)
+                )
+                Box(
+                    modifier =
+                        Modifier.renderInSharedTransitionScopeOverlay(zIndexInOverlay = 1f)
+                            .size(100.dp)
+                            .background(Color.Black)
+                )
+            }
+        }
+
+        rule.runOnIdle {
+            rule.mainClock.autoAdvance = false
+            showOverlay = !showOverlay
+        }
+        rule.waitForIdle()
+
+        repeat(6) {
+            rule.mainClock.advanceTimeBy(100)
+            rule.onNodeWithTag("root").captureToImage().assertContainsColor(Color.Black)
+        }
+
+        rule.mainClock.autoAdvance = true
+
+        rule.runOnIdle {
+            rule.mainClock.autoAdvance = false
+            showOverlay = !showOverlay
+        }
+        rule.waitForIdle()
+
+        repeat(6) {
+            rule.mainClock.advanceTimeBy(100)
+            rule.onNodeWithTag("root").captureToImage().assertContainsColor(Color.Black)
+        }
     }
 
     // Regression test for b/347520198, SharedTransitionLayout onDraw would not get invalidated

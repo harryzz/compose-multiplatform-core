@@ -24,10 +24,10 @@ import android.view.inputmethod.BaseInputConnection
 import android.view.inputmethod.EditorInfo
 import androidx.annotation.VisibleForTesting
 import androidx.compose.foundation.text.LegacyTextFieldState
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.foundation.text.handwriting.isStylusHandwritingSupported
 import androidx.compose.foundation.text.selection.TextFieldSelectionManager
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Matrix
@@ -60,7 +60,6 @@ private const val DEBUG_CLASS = "AndroidLegacyPlatformTextInputServiceAdapter"
 @VisibleForTesting
 internal var inputMethodManagerFactory: (View) -> InputMethodManager = ::InputMethodManagerImpl
 
-@Suppress("DEPRECATION")
 @Composable
 internal actual fun legacyTextInputServiceAdapterAndService():
     Pair<LegacyPlatformTextInputServiceAdapter, TextInputService> {

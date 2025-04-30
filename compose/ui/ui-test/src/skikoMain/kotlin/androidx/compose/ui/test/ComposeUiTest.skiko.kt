@@ -42,7 +42,10 @@ import androidx.compose.ui.unit.IntSize
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.jvm.JvmName
 import kotlin.math.roundToInt
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
@@ -51,6 +54,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestDispatcher
+import kotlinx.coroutines.test.TestResult
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
@@ -61,8 +65,30 @@ import org.jetbrains.skia.Surface
 import org.jetbrains.skiko.currentNanoTime
 
 @ExperimentalTestApi
-actual fun runComposeUiTest(effectContext: CoroutineContext, block: ComposeUiTest.() -> Unit) {
+//@Deprecated(
+//    level = DeprecationLevel.HIDDEN,
+//    message = "Replaced with same function, but with suspend block, runTextContext, testTimeout"
+//)
+fun runComposeUiTest(
+    effectContext: CoroutineContext = EmptyCoroutineContext,
+    block: ComposeUiTest.() -> Unit
+) {
     SkikoComposeUiTest(effectContext = effectContext).runTest(block)
+}
+
+@ExperimentalTestApi
+@Deprecated(
+    level = DeprecationLevel.HIDDEN,
+    message = "TODO: Adopt runComposeUiTest with suspend lambda"
+)
+actual fun runComposeUiTest(
+    effectContext: CoroutineContext,
+    runTestContext: CoroutineContext,
+    testTimeout: Duration,
+    block: suspend ComposeUiTest.() -> Unit
+): TestResult {
+    // TODO: https://youtrack.jetbrains.com/issue/CMP-7994
+    TODO("Adopt runComposeUiTest with suspend lambda")
 }
 
 @ExperimentalTestApi

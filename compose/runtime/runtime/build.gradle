@@ -116,6 +116,7 @@ if(AndroidXComposePlugin.isMultiplatformEnabled(project)) {
             commonMain.dependencies {
                 implementation(libs.kotlinStdlib)
                 api(libs.kotlinCoroutinesCore)
+                api(project(":compose:runtime:runtime-annotation"))
                 implementation(project(":annotation:annotation"))
                 implementation(project(":collection:collection"))
             }
@@ -185,7 +186,7 @@ if(AndroidXComposePlugin.isMultiplatformEnabled(project)) {
                 }
             }
 
-            posixMain.dependsOn(nativeMain)
+            unixMain.dependsOn(nativeMain)
 
             jbMain {
                 dependsOn(commonMain)
@@ -197,11 +198,11 @@ if(AndroidXComposePlugin.isMultiplatformEnabled(project)) {
             jsNativeMain.dependsOn(jbMain)
 
             darwinMain {
-                dependsOn(posixMain)
+                dependsOn(unixMain)
             }
 
             linuxMain {
-                dependsOn(posixMain)
+                dependsOn(unixMain)
             }
 
             linuxTest {

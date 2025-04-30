@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.Density
 import androidx.test.ext.junit.rules.ActivityScenarioRule
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
+import kotlin.time.Duration
 import kotlinx.coroutines.test.TestCoroutineScheduler
 import kotlinx.coroutines.test.TestDispatcher
 import org.junit.rules.TestRule
@@ -277,7 +278,14 @@ private constructor(
         activityProvider: (R) -> A,
     ) : this(
         activityRule,
-        AndroidComposeUiTestEnvironment(effectContext) { activityProvider(activityRule) },
+        AndroidComposeUiTestEnvironment(
+            effectContext = effectContext,
+            // Since now it calls kotlinx.coroutines.test.runTest under the hood,
+            // to preserve the behaviour compatibility we set an Infinite timeout
+            testTimeout = Duration.INFINITE
+        ) {
+            activityProvider(activityRule)
+        },
     )
 
     /**
@@ -289,10 +297,25 @@ private constructor(
         get() = checkNotNull(composeTest.activity) { "Host activity not found" }
 
     override fun apply(base: Statement, description: Description): Statement {
-        val testStatement = activityRule.apply(base, description)
+        val testWithDisposal =
+            object : Statement() {
+                override fun evaluate() {
+                    var blockException: Throwable? = null
+                    try {
+                        // Run the test
+                        base.evaluate()
+                    } catch (t: Throwable) {
+                        blockException = t
+                    }
+
+                    // Throw the aggregate exception. May be from the test body or from the cleanup.
+                    blockException?.let { throw it }
+                }
+            }
+
         return object : Statement() {
             override fun evaluate() {
-                environment.runTest { testStatement.evaluate() }
+                environment.runTest { activityRule.apply(testWithDisposal, description).evaluate() }
             }
         }
     }
