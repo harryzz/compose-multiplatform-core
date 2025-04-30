@@ -14,22 +14,8 @@
  * limitations under the License.
  */
 
-package androidx.compose.foundation.internal
+package androidx.compose.foundation
 
-internal expect class AtomicReference<V>(value: V) {
-    fun get(): V
+internal actual typealias AtomicReference<V> = java.util.concurrent.atomic.AtomicReference<V>
 
-    fun set(value: V)
-
-    fun getAndSet(value: V): V
-
-    fun compareAndSet(expect: V, newValue: V): Boolean
-}
-
-internal expect class AtomicLong(value: Long) {
-    fun get(): Long
-
-    fun set(value: Long)
-
-    fun getAndIncrement(): Long
-}
+internal actual typealias AtomicLong = java.util.concurrent.atomic.AtomicLong
