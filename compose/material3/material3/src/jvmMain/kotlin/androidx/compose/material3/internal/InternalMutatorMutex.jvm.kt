@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 The Android Open Source Project
+ * Copyright 2024 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,14 +16,9 @@
 
 package androidx.compose.material3.internal
 
-import kotlinx.atomicfu.atomic
+/* Copy of androidx.compose.material.ActualJvm, mirrored from Foundation. This is used for the
+  M2/M3-internal copy of MutatorMutex.
+*/
 
-internal actual class AtomicReference<V> actual constructor(value: V) {
-    private val delegate = atomic(value)
-    actual fun get() = delegate.value
-    actual fun set(value: V) {
-        delegate.value = value
-    }
-    actual fun getAndSet(value: V) = delegate.getAndSet(value)
-    actual fun compareAndSet(expect: V, newValue: V) = delegate.compareAndSet(expect, newValue)
-}
+internal actual typealias InternalAtomicReference<V> =
+    java.util.concurrent.atomic.AtomicReference<V>
