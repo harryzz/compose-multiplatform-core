@@ -82,6 +82,26 @@ class TestNavigatorStateTest {
     }
 
     @Test
+    fun testSupportingPaneLifecycle() {
+        val navigator = SupportingPaneTestNavigator()
+        navigator.onAttach(state)
+        val firstEntry = state.createBackStackEntry(navigator.createDestination(), null)
+        assertThat(firstEntry.lifecycle.currentState).isEqualTo(Lifecycle.State.INITIALIZED)
+
+        navigator.navigate(listOf(firstEntry), null, null)
+        assertThat(firstEntry.lifecycle.currentState).isEqualTo(Lifecycle.State.RESUMED)
+
+        val secondEntry = state.createBackStackEntry(navigator.createDestination(), null)
+        navigator.navigate(listOf(secondEntry), null, null)
+        assertThat(firstEntry.lifecycle.currentState).isEqualTo(Lifecycle.State.RESUMED)
+        assertThat(secondEntry.lifecycle.currentState).isEqualTo(Lifecycle.State.RESUMED)
+
+        navigator.popBackStack(secondEntry, false)
+        assertThat(firstEntry.lifecycle.currentState).isEqualTo(Lifecycle.State.RESUMED)
+        assertThat(secondEntry.lifecycle.currentState).isEqualTo(Lifecycle.State.DESTROYED)
+    }
+
+    @Test
     fun testWithTransitionLifecycle() {
         val navigator = TestTransitionNavigator()
         navigator.onAttach(state)
@@ -116,6 +136,58 @@ class TestNavigatorStateTest {
         val restoredSecondEntry = state.restoreBackStackEntry(secondEntry)
         navigator.navigate(listOf(restoredSecondEntry), null, null)
         assertThat(firstEntry.lifecycle.currentState).isEqualTo(Lifecycle.State.CREATED)
+        assertThat(restoredSecondEntry.lifecycle.currentState).isEqualTo(Lifecycle.State.STARTED)
+        assertThat(state.transitionsInProgress.value.contains(firstEntry)).isTrue()
+
+        state.markTransitionComplete(firstEntry)
+        state.markTransitionComplete(restoredSecondEntry)
+        assertThat(restoredSecondEntry.lifecycle.currentState).isEqualTo(Lifecycle.State.RESUMED)
+    }
+
+    @Test
+    fun testWithSupportingPaneTransitionLifecycle() {
+        val navigator = SupportingPaneTestTransitionNavigator()
+        navigator.onAttach(state)
+        val firstEntry = state.createBackStackEntry(navigator.createDestination(), null)
+        assertThat(firstEntry.lifecycle.currentState).isEqualTo(Lifecycle.State.INITIALIZED)
+
+        navigator.navigate(listOf(firstEntry), null, null)
+        assertThat(firstEntry.lifecycle.currentState).isEqualTo(Lifecycle.State.STARTED)
+
+        state.markTransitionComplete(firstEntry)
+        assertThat(firstEntry.lifecycle.currentState).isEqualTo(Lifecycle.State.RESUMED)
+
+        val secondEntry = state.createBackStackEntry(navigator.createDestination(), null)
+        navigator.navigate(listOf(secondEntry), null, null)
+        // Both are started because they are SupportingPane destinations
+        assertThat(firstEntry.lifecycle.currentState).isEqualTo(Lifecycle.State.STARTED)
+        assertThat(secondEntry.lifecycle.currentState).isEqualTo(Lifecycle.State.STARTED)
+        assertThat(state.transitionsInProgress.value.contains(firstEntry)).isTrue()
+
+        state.markTransitionComplete(secondEntry)
+        // Even though the secondEntry has completed its transition, the firstEntry
+        // hasn't completed its transition, so it shouldn't be resumed yet
+        assertThat(firstEntry.lifecycle.currentState).isEqualTo(Lifecycle.State.STARTED)
+        assertThat(secondEntry.lifecycle.currentState).isEqualTo(Lifecycle.State.RESUMED)
+
+        state.markTransitionComplete(firstEntry)
+        // Both are resumed because they are SupportingPane destinations that have finished
+        // their transitions
+        assertThat(firstEntry.lifecycle.currentState).isEqualTo(Lifecycle.State.RESUMED)
+        assertThat(secondEntry.lifecycle.currentState).isEqualTo(Lifecycle.State.RESUMED)
+
+        navigator.popBackStack(secondEntry, true)
+        assertThat(secondEntry.lifecycle.currentState).isEqualTo(Lifecycle.State.CREATED)
+        assertThat(firstEntry.lifecycle.currentState).isEqualTo(Lifecycle.State.STARTED)
+
+        state.markTransitionComplete(firstEntry)
+        assertThat(firstEntry.lifecycle.currentState).isEqualTo(Lifecycle.State.RESUMED)
+        state.markTransitionComplete(secondEntry)
+        assertThat(secondEntry.lifecycle.currentState).isEqualTo(Lifecycle.State.DESTROYED)
+
+        val restoredSecondEntry = state.restoreBackStackEntry(secondEntry)
+        navigator.navigate(listOf(restoredSecondEntry), null, null)
+        assertThat(firstEntry.lifecycle.currentState).isEqualTo(Lifecycle.State.STARTED)
         assertThat(restoredSecondEntry.lifecycle.currentState).isEqualTo(Lifecycle.State.STARTED)
         assertThat(state.transitionsInProgress.value.contains(firstEntry)).isTrue()
 
