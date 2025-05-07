@@ -23,11 +23,15 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.testing.TestLifecycleOwner
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.navigation.FloatingWindow
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavDestination
+import androidx.navigation.NavOptions
 import androidx.navigation.Navigator
+import androidx.navigation.SupportingPane
 import androidx.navigation.navOptions
 import androidx.navigation.testing.TestNavigatorStateTest.FloatingTestDestination
 import kotlin.test.BeforeTest
@@ -400,10 +404,67 @@ class TestNavigatorStateTest {
         assertThat(secondEntry.lifecycle.currentState).isEqualTo(Lifecycle.State.DESTROYED)
     }
 
+    @Navigator.Name("test")
+    internal class TestNavigator : Navigator<NavDestination>(TEST_NAVIGATOR_NAME) {
+        override fun createDestination(): NavDestination = NavDestination(this)
+    }
 
-    internal class FloatingTestDestination(
-        navigator: Navigator<out NavDestination>
-    ) : NavDestination(navigator), FloatingWindow
+    @Navigator.Name("test")
+    internal class TestTransitionNavigator : Navigator<NavDestination>() {
+        private val testLifecycleOwner = TestLifecycleOwner()
+        val testLifecycle = testLifecycleOwner.lifecycle
+
+        override fun createDestination(): NavDestination = NavDestination(this)
+
+        override fun navigate(
+            entries: List<NavBackStackEntry>,
+            navOptions: NavOptions?,
+            navigatorExtras: Extras?
+        ) {
+            entries.forEach { entry -> state.pushWithTransition(entry) }
+        }
+
+        override fun popBackStack(popUpTo: NavBackStackEntry, savedState: Boolean) {
+            state.popWithTransition(popUpTo, savedState)
+        }
+    }
+
+    @Navigator.Name(TEST_NAVIGATOR_NAME)
+    internal class FloatingWindowTestNavigator : Navigator<FloatingTestDestination>(TEST_NAVIGATOR_NAME) {
+        override fun createDestination(): FloatingTestDestination = FloatingTestDestination(this)
+    }
+
+    internal class FloatingTestDestination(navigator: Navigator<out NavDestination>) :
+        NavDestination(navigator), FloatingWindow
+
+    @Navigator.Name(TEST_NAVIGATOR_NAME)
+    internal class SupportingPaneTestNavigator : Navigator<SupportingPaneTestDestination>(TEST_NAVIGATOR_NAME) {
+        override fun createDestination(): SupportingPaneTestDestination =
+            SupportingPaneTestDestination(this)
+    }
+
+    @Navigator.Name(TEST_NAVIGATOR_NAME)
+    internal class SupportingPaneTestTransitionNavigator :
+        Navigator<SupportingPaneTestDestination>(TEST_NAVIGATOR_NAME) {
+
+        override fun createDestination(): SupportingPaneTestDestination =
+            SupportingPaneTestDestination(this)
+
+        override fun navigate(
+            entries: List<NavBackStackEntry>,
+            navOptions: NavOptions?,
+            navigatorExtras: Extras?
+        ) {
+            entries.forEach { entry -> state.pushWithTransition(entry) }
+        }
+
+        override fun popBackStack(popUpTo: NavBackStackEntry, savedState: Boolean) {
+            state.popWithTransition(popUpTo, savedState)
+        }
+    }
+
+    internal class SupportingPaneTestDestination(navigator: Navigator<out NavDestination>) :
+        NavDestination(navigator), SupportingPane
 
     class TestViewModel : ViewModel() {
         var wasCleared = false
@@ -415,10 +476,4 @@ class TestNavigatorStateTest {
     }
 }
 
-internal expect class TestNavigator() : Navigator<NavDestination>
-
-internal expect class TestTransitionNavigator() : Navigator<NavDestination> {
-    val testLifecycle: LifecycleRegistry
-}
-
-internal expect class FloatingWindowTestNavigator() : Navigator<FloatingTestDestination>
+private const val TEST_NAVIGATOR_NAME = "test"
