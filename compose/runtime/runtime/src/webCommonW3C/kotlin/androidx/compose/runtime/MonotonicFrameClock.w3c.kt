@@ -16,11 +16,11 @@
 
 package androidx.compose.runtime
 
-import kotlinx.browser.window
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
 import kotlin.time.DurationUnit
 import kotlin.time.toDuration
+import kotlinx.browser.window
 
 /**
  * The [MonotonicFrameClock] used by [withFrameNanos] and [withFrameMillis] if one is not present in
@@ -32,14 +32,14 @@ import kotlin.time.toDuration
     "MonotonicFrameClocks are not globally applicable across platforms. " +
         "Use an appropriate local clock."
 )
-actual val DefaultMonotonicFrameClock: MonotonicFrameClock = object : MonotonicFrameClock {
-    override suspend fun <R> withFrameNanos(
-        onFrame: (Long) -> R
-    ): R = suspendCoroutine { continuation ->
-        window.requestAnimationFrame {
-            val duration = it.toDuration(DurationUnit.MILLISECONDS)
-            val result = onFrame(duration.inWholeNanoseconds)
-            continuation.resume(result)
-        }
+actual val DefaultMonotonicFrameClock: MonotonicFrameClock =
+    object : MonotonicFrameClock {
+        override suspend fun <R> withFrameNanos(onFrame: (Long) -> R): R =
+            suspendCoroutine { continuation ->
+                window.requestAnimationFrame {
+                    val duration = it.toDuration(DurationUnit.MILLISECONDS)
+                    val result = onFrame(duration.inWholeNanoseconds)
+                    continuation.resume(result)
+                }
+            }
     }
-}
