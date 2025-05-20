@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 The Android Open Source Project
+ * Copyright 2025 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,16 +14,9 @@
  * limitations under the License.
  */
 
-package androidx.compose.ui.inspection.proto
+package androidx.compose.integration.hero.pokedex.macrobenchmark.target
 
-import com.google.common.truth.Truth.assertThat
-import org.junit.Test
+import com.bumptech.glide.annotation.GlideModule
+import com.bumptech.glide.module.AppGlideModule
 
-class ComposeExtensionsTest {
-    @Test
-    fun testLambdaSelector() {
-        assertThat(findLambdaSelector("com.example.Compose\$MainActivityKt\$lambda-10\$1\$2\$2\$1"))
-            .isEqualTo("lambda-10\$1\$2\$2\$1")
-        assertThat(findLambdaSelector("com.example.Class\$f1\$3\$2")).isEqualTo("3$2")
-    }
-}
+@GlideModule class PokedexGlideAppModule : AppGlideModule()
