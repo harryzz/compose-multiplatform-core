@@ -14,7 +14,24 @@
  * limitations under the License.
  */
 
-package androidx.compose.foundation.text.contextmenu.data
+package com.android.tools.deploy.liveedit;
 
-// TODO: https://youtrack.jetbrains.com/issue/CMP-7757
-internal actual class PlatformIcon
+import java.util.Map;
+
+/**
+ * Interface from Live Edit
+ */
+public interface SourceLocationAware {
+
+    /**
+     * Get the source location from a Live Edit lambda.
+     *
+     * @return a Map with:
+     * - lambda: The original lambda class name,
+     * - file: The file containing the lambda,
+     * - startLine: The starting line as an int,
+     * - endLine: The ending line as an int.
+     */
+    @SuppressWarnings("unused")
+    Map<String, Object> getSourceLocationInfo();
+}
