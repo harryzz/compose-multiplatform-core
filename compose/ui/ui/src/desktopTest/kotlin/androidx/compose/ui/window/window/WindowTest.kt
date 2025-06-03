@@ -35,6 +35,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.LeakDetector
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.awt.ComposeWindow
+import androidx.compose.ui.awt.SwingWindow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.isLinux
 import androidx.compose.ui.layout.Layout
@@ -80,7 +81,7 @@ class WindowTest {
             }
 
             if (isOpen) {
-                Window(
+                SwingWindow(
                     create = ::createWindow,
                     dispose = ComposeWindow::dispose
                 ) {
@@ -115,7 +116,7 @@ class WindowTest {
             }
 
             if (isOpen) {
-                Window(
+                SwingWindow(
                     create = ::createWindow,
                     dispose = ComposeWindow::dispose,
                     update = { it.title = title }
