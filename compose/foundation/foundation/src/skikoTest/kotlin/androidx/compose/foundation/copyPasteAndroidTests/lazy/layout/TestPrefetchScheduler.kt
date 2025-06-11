@@ -16,7 +16,7 @@
 
 @file:Suppress("DEPRECATION") // b/420551535
 
-package androidx.compose.foundation.copyPasteAndroidTests.pager
+package androidx.compose.foundation.copyPasteAndroidTests.lazy.layout
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.lazy.layout.PrefetchRequest
@@ -33,8 +33,17 @@ internal class TestPrefetchScheduler : PrefetchScheduler {
     }
 
     fun executeActiveRequests() {
-        activeRequests.forEach { with(it) { scope.execute() } }
-        activeRequests.clear()
+        while (activeRequests.isNotEmpty()) {
+            executeOneRequest()
+        }
+    }
+
+    fun executeOneRequest() {
+        if (activeRequests.isNotEmpty()) {
+            val request = activeRequests[0]
+            val hasMoreWorkToDo = with(request) { scope.execute() }
+            if (!hasMoreWorkToDo) activeRequests.removeAt(0)
+        }
     }
 
     private val scope =
