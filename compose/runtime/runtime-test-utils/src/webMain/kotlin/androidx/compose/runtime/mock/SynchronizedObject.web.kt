@@ -16,11 +16,9 @@
 
 package androidx.compose.runtime.mock
 
-// TODO: Replace with another copy for expect/actual posix implementation
+internal actual class SynchronizedObject actual constructor()
 
-@Suppress("ACTUAL_WITHOUT_EXPECT") // https://youtrack.jetbrains.com/issue/KT-37316
-internal actual class SynchronizedObject actual constructor(): kotlinx.atomicfu.locks.SynchronizedObject()
-
-@PublishedApi
-internal actual inline fun <R> synchronized(lock: SynchronizedObject, block: () -> R): R =
-    kotlinx.atomicfu.locks.synchronized(lock, block)
+internal actual inline fun <T> synchronizedImpl(
+    lock: SynchronizedObject,
+    crossinline action: () -> T,
+): T = action()
