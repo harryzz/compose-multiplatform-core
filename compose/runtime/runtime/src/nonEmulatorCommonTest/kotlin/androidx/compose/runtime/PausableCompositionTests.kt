@@ -25,12 +25,10 @@ import androidx.compose.runtime.mock.ViewApplier
 import androidx.compose.runtime.mock.compositionTest
 import androidx.compose.runtime.mock.validate
 import androidx.compose.runtime.mock.view
-import androidx.compose.runtime.runTest
 import kotlin.coroutines.resume
 import kotlin.test.Ignore
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlinx.coroutines.CancellableContinuation
@@ -82,7 +80,7 @@ class PausableCompositionTests {
             recording,
             "+A, ^z, ^Y, *B, +B, *Linear, +A:1, *C, +C, ^x, *Text, -C, *D, +D, +D:1, *C, +C, " +
                 "^x, *Text, -C, *C, +C, ^x, *Text, -C, *C, +C, ^x, *Text, -C, -D:1, -D, -A:1, " +
-                "-B, -A"
+                "-B, -A",
         )
     }
 
@@ -115,7 +113,7 @@ class PausableCompositionTests {
             recording,
             "+A, ^z, ^Y, *B, -A, +B, *Linear, -B, +A:1, *C, *D, -A:1, +C, " +
                 "^x, *Text, -C, +D, -D, +D:1, *C, *C, *C, -D:1, +C, ^x, *Text, -C, +C, ^x, *Text, " +
-                "-C, +C, ^x, *Text, -C"
+                "-C, +C, ^x, *Text, -C",
         )
     }
 
@@ -146,7 +144,7 @@ class PausableCompositionTests {
             "+A, ^z, ^Y, *B, -A, +B, *Linear, -B, +A:1, *C, *D, -A:1, +C, " +
                 "^x, *Text, -C, +D, -D, +D:1, *C, *C, *C, -D:1, +C, ^x, *Text, -C, +C, ^x, *Text, " +
                 "-C, +C, ^x, *Text, -C",
-            recording
+            recording,
         )
     }
 
@@ -180,7 +178,7 @@ class PausableCompositionTests {
                     "^x, *Text, -C, +D, -D, +D:1, *C, *C, *C, -D:1, +C, ^x, *Text, -C, +C, ^x, *Text, " +
                     "-C, +C, ^x, *Text, -C")
                 .splitRecording(),
-            recording.splitRecording()
+            recording.splitRecording(),
         )
     }
 
@@ -281,7 +279,7 @@ class PausableCompositionTests {
             "C(a), +B, *Linear, -B, C(b), +B, *Linear, -B, C(c), C(d), +C, ^x, *Text, -C, +D, " +
                 "-D, +D:1, *C, *C, *C, -D:1, +C, ^x, *Text, -C, +C, ^x, *Text, -C, +C, ^x, *Text, " +
                 "-C, +a, +b, +c, +d",
-            recording
+            recording,
         )
     }
 
@@ -428,14 +426,53 @@ class PausableCompositionTests {
     }
 
     @Test
-    fun pausableComposition_throwInResume() = runTest(expected = IllegalStateException::class) {
+    fun pausableComposition_throwInResume() =
+        runTest(expected = IllegalStateException::class) {
+            val recomposer = Recomposer(coroutineContext)
+            val pausableComposition = PausableComposition(EmptyApplier(), recomposer)
+
+            try {
+                val handle = pausableComposition.setPausableContent { error("Test error") }
+                handle.resume { false }
+                handle.apply()
+            } finally {
+                recomposer.cancel()
+                recomposer.close()
+            }
+        }
+
+    @Test
+    fun pausableComposition_throwInApply() =
+        runTest(expected = IllegalStateException::class) {
+            val recomposer = Recomposer(coroutineContext)
+            val pausableComposition = PausableComposition(EmptyApplier(), recomposer)
+
+            try {
+                val handle =
+                    pausableComposition.setPausableContent {
+                        DisposableEffect(Unit) { throw IllegalStateException("test") }
+                    }
+                handle.resume { false }
+                handle.apply()
+            } finally {
+                recomposer.cancel()
+                recomposer.close()
+            }
+        }
+
+    @Test
+    fun pausableComposition_isAppliedReturnsCorrectValue() = runTest {
         val recomposer = Recomposer(coroutineContext)
         val pausableComposition = PausableComposition(EmptyApplier(), recomposer)
 
         try {
-            val handle = pausableComposition.setPausableContent { error("Test error") }
+            val handle =
+                pausableComposition.setPausableContent { DisposableEffect(Unit) { onDispose {} } }
+            assertFalse(handle.isApplied)
             handle.resume { false }
+            assertFalse(handle.isApplied)
             handle.apply()
+            assertTrue(handle.isApplied)
         } finally {
             recomposer.cancel()
             recomposer.close()
@@ -443,17 +480,18 @@ class PausableCompositionTests {
     }
 
     @Test
-    fun pausableComposition_throwInApply() = runTest(expected = IllegalStateException::class) {
+    fun pausableComposition_isCancelledReturnsCorrectValue() = runTest {
         val recomposer = Recomposer(coroutineContext)
         val pausableComposition = PausableComposition(EmptyApplier(), recomposer)
 
         try {
             val handle =
-                pausableComposition.setPausableContent {
-                    DisposableEffect(Unit) { throw IllegalStateException("test") }
-                }
+                pausableComposition.setPausableContent { DisposableEffect(Unit) { onDispose {} } }
+            assertFalse(handle.isCancelled)
             handle.resume { false }
-            handle.apply()
+            assertFalse(handle.isCancelled)
+            handle.cancel()
+            assertTrue(handle.isCancelled)
         } finally {
             recomposer.cancel()
             recomposer.close()
@@ -627,7 +665,7 @@ class PausableContentWorkflowDriver(
     private val composition: PausableComposition,
     private val content: @Composable () -> Unit,
     private var host: View?,
-    private var contentView: View?
+    private var contentView: View?,
 ) : PausableContentWorkflowScope {
     private var pausedComposition: PausedComposition? = null
     override var iteration = 0
@@ -672,7 +710,7 @@ class PausableContentWorkflowDriver(
 private fun PausableContent(
     workflow: suspend PausableContentWorkflowScope.() -> Unit = { run() },
     createApplier: (view: View) -> Applier<View> = { ViewApplier(it) },
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
     val host = View().also { it.name = "PausableContentHost" }
     val pausableContent = View().also { it.name = "PausableContent" }
