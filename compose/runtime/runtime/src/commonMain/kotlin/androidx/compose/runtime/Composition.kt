@@ -19,6 +19,7 @@
 package androidx.compose.runtime
 
 import androidx.collection.MutableScatterSet
+import androidx.collection.ScatterSet
 import androidx.compose.runtime.changelist.ChangeList
 import androidx.compose.runtime.collection.ScopeMap
 import androidx.compose.runtime.collection.fastForEach
@@ -416,6 +417,10 @@ private val PendingApplyNoModifications = Any()
 internal val ObservableCompositionServiceKey =
     object : CompositionServiceKey<ObservableComposition> {}
 
+private const val RUNNING = 0
+private const val INCONSISTENT = 1
+private const val DISPOSED = 2
+
 /**
  * The implementation of the [Composition] interface.
  *
@@ -594,7 +599,7 @@ internal class CompositionImpl(
     val isRoot: Boolean = parent is Recomposer
 
     /** True if [dispose] has been called. */
-    private var disposed = false
+    private var state = RUNNING
 
     /** True if a sub-composition of this composition is current composing. */
     private val areChildrenComposing
@@ -610,22 +615,18 @@ internal class CompositionImpl(
         get() = composer.isComposing
 
     override val isDisposed: Boolean
-        get() = disposed
+        get() = state == DISPOSED
 
     override val hasPendingChanges: Boolean
         get() = synchronized(lock) { composer.hasPendingChanges }
 
     override fun setContent(content: @Composable () -> Unit) {
-        checkPrecondition(pendingPausedComposition == null) {
-            "A pausable composition is in progress"
-        }
+        checkState()
         composeInitial(content)
     }
 
     override fun setContentWithReuse(content: @Composable () -> Unit) {
-        checkPrecondition(pendingPausedComposition == null) {
-            "A pausable composition is in progress"
-        }
+        checkState()
         composer.startReuseFromRoot()
 
         composeInitial(content)
@@ -634,10 +635,7 @@ internal class CompositionImpl(
     }
 
     override fun setPausableContent(content: @Composable () -> Unit): PausedComposition {
-        checkPrecondition(!disposed) { "The composition is disposed" }
-        checkPrecondition(pendingPausedComposition == null) {
-            "A pausable composition is in progress"
-        }
+        checkState()
         val pausedComposition =
             PausedCompositionImpl(
                 composition = this,
@@ -654,7 +652,7 @@ internal class CompositionImpl(
     }
 
     override fun setPausableContentWithReuse(content: @Composable () -> Unit): PausedComposition {
-        checkPrecondition(!disposed) { "The composition is disposed" }
+        checkState()
         checkPrecondition(pendingPausedComposition == null) {
             "A pausable composition is in progress"
         }
@@ -673,14 +671,32 @@ internal class CompositionImpl(
         return pausedComposition
     }
 
-    internal fun pausedCompositionFinished() {
+    internal fun pausedCompositionFinished(ignoreSet: ScatterSet<RememberObserverHolder>?) {
         pendingPausedComposition = null
+        if (ignoreSet != null) {
+            rememberManager.ignoreForgotten(ignoreSet)
+            state = INCONSISTENT
+        }
     }
 
     private fun composeInitial(content: @Composable () -> Unit) {
-        checkPrecondition(!disposed) { "The composition is disposed" }
         this.composable = content
         parent.composeInitial(this, composable)
+    }
+
+    private fun checkState() {
+        checkPrecondition(state == RUNNING) {
+            when (state) {
+                INCONSISTENT ->
+                    "A previous pausable composition for this composition was cancelled. This " +
+                        "composition must be disposed."
+                DISPOSED -> "The composition is disposed"
+                else -> "" // Excluded by the precondition check
+            }
+        }
+        checkPrecondition(pendingPausedComposition == null) {
+            "A pausable composition is in progress"
+        }
     }
 
     @OptIn(ExperimentalComposeRuntimeApi::class)
@@ -808,8 +824,8 @@ internal class CompositionImpl(
                 "Composition is disposed while composing. If dispose is triggered by a call in " +
                     "@Composable function, consider wrapping it with SideEffect block."
             }
-            if (!disposed) {
-                disposed = true
+            if (state != DISPOSED) {
+                state = DISPOSED
                 composable = {}
 
                 // Changes are deferred if the composition contains movable content that needs
@@ -887,6 +903,31 @@ internal class CompositionImpl(
     }
 
     override fun prepareCompose(block: () -> Unit) = composer.prepareCompose(block)
+
+    /**
+     * Extract the invalidations that are in the group with the given marker. This is used when
+     * movable content is moved between tables and the content was invalidated. This is used to move
+     * the invalidations with the content.
+     */
+    internal fun extractInvalidationsOf(anchor: Anchor): List<Pair<RecomposeScopeImpl, Any>> {
+        return if (invalidations.size > 0) {
+            val result = mutableListOf<Pair<RecomposeScopeImpl, Any>>()
+            val slotTable = slotTable
+            invalidations.removeIf { scope, value ->
+                val scopeAnchor = scope.anchor
+                if (scopeAnchor != null && slotTable.inGroup(anchor, scopeAnchor)) {
+                    result.add(scope to value)
+
+                    // Remove the invalidation
+                    true
+                } else {
+                    // Keep the invalidation
+                    false
+                }
+            }
+            result
+        } else emptyList()
+    }
 
     private fun addPendingInvalidationsLocked(value: Any, forgetConditionalScopes: Boolean) {
         observations.forEachScopeOf(value) { scope ->
@@ -1227,15 +1268,11 @@ internal class CompositionImpl(
                 val delegate =
                     invalidationDelegate?.let { changeDelegate ->
                         // Invalidations are delegated when recomposing changes to movable content
-                        // that
-                        // is destined to be moved. The movable content is composed in the
-                        // destination
-                        // composer but all the recompose scopes point the current composer and will
-                        // arrive
-                        // here. this redirects the invalidations that will be moved to the
-                        // destination
-                        // composer instead of recording an invalid invalidation in the from
-                        // composer.
+                        // that is destined to be moved. The movable content is composed in the
+                        // destination composer but all the recompose scopes point the current
+                        // composer and will arrive here. this redirects the invalidations that
+                        // will be moved to the destination composer instead of recording an
+                        // invalid invalidation in the from composer.
                         if (slotTable.groupContainsAnchor(invalidationDelegateGroup, anchor)) {
                             changeDelegate
                         } else null
@@ -1254,8 +1291,7 @@ internal class CompositionImpl(
                         invalidations.set(scope, ScopeInvalidated)
                     } else if (instance !is DerivedState<*>) {
                         // If observer is not set, we only need to add derived states to
-                        // invalidation,
-                        // as regular states are always going to invalidate.
+                        // invalidation, as regular states are always going to invalidate.
                         invalidations.set(scope, ScopeInvalidated)
                     } else {
                         if (!invalidations.anyScopeOf(scope) { it === ScopeInvalidated }) {
@@ -1327,6 +1363,9 @@ internal class CompositionImpl(
 
     override fun deactivate() {
         synchronized(lock) {
+            checkPrecondition(pendingPausedComposition == null) {
+                "Deactivate is not supported while pausable composition is in progress"
+            }
             val nonEmptySlotTable = slotTable.groupsSize > 0
             if (nonEmptySlotTable || abandonSet.isNotEmpty()) {
                 trace("Compose:deactivate") {
