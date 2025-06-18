@@ -14,23 +14,22 @@
  * limitations under the License.
  */
 
+@file:JvmName("WindowAdaptiveInfo_skikoKt")
+
 package androidx.compose.material3.adaptive
 
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.ExperimentalComposeUiApi
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalWindowInfo
-import androidx.compose.ui.unit.toSize
-import androidx.window.core.layout.WindowSizeClass
+import kotlin.jvm.JvmName
 
-@OptIn(ExperimentalComposeUiApi::class)
+@Deprecated(
+    level = DeprecationLevel.HIDDEN,
+    message = "Moved to common source set, maintained for binary compatibility.",
+)
 @Composable
-actual fun currentWindowAdaptiveInfo(): WindowAdaptiveInfo {
-    val density = LocalDensity.current
-    val windowInfo = LocalWindowInfo.current
-    val size = with(density) { windowInfo.containerSize.toSize().toDpSize() }
-    return WindowAdaptiveInfo(
-        WindowSizeClass.compute(size.width.value, size.height.value),
-        Posture() //postures and hinges are relevant to android devices only
-    )
-}
+fun currentWindowAdaptiveInfo(): WindowAdaptiveInfo = currentWindowAdaptiveInfo(false)
+
+private val DefaultPosture = Posture()
+
+@Composable
+internal actual fun calculatePosture(): Posture =
+    DefaultPosture // Postures and hinges are relevant to android devices only
