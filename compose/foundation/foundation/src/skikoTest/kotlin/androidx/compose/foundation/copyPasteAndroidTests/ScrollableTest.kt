@@ -81,6 +81,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.test.IgnoreIosTarget
 
 @OptIn(ExperimentalTestApi::class)
 class ScrollableTest {
@@ -1155,6 +1156,7 @@ class ScrollableTest {
     }
 
     @Test
+    @IgnoreIosTarget // https://youtrack.jetbrains.com/issue/CMP-8401
     fun scrollable_nestedFling() = runComposeUiTest {
         var innerDrag = 0f
         var outerDrag = 0f
@@ -2130,6 +2132,7 @@ class ScrollableTest {
     }
 
     @Test
+    @IgnoreIosTarget // https://youtrack.jetbrains.com/issue/CMP-8401
     fun scrollable_flingBehaviourCalled() = runComposeUiTest {
         var total = 0f
         val controller =
@@ -2164,6 +2167,7 @@ class ScrollableTest {
     }
 
     @Test
+    @IgnoreIosTarget // https://youtrack.jetbrains.com/issue/CMP-8401
     fun scrollable_flingBehaviourCalled_reversed() = runComposeUiTest {
         var total = 0f
         val controller =
@@ -2869,6 +2873,7 @@ class ScrollableTest {
     }
 
     @Test
+    @IgnoreIosTarget // https://youtrack.jetbrains.com/issue/CMP-8401
     fun disableSystemAnimations_defaultFlingBehaviorShouldContinueToWork() = runComposeUiTest {
 
         val controller = ScrollableState { 0f }
@@ -3124,6 +3129,7 @@ class ScrollableTest {
     }
 
     @Test
+    @IgnoreIosTarget // https://youtrack.jetbrains.com/issue/CMP-8401
     fun onDensityChange_shouldUpdateFlingBehavior() = runComposeUiTest {
         var density by mutableStateOf(density)
         var flingDelta = 0f
