@@ -43,8 +43,6 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.BottomAppBarState.Companion.Saver
-import androidx.compose.material3.DefaultSingleRowTopAppBarOverride.SingleRowTopAppBar
-import androidx.compose.material3.DefaultTwoRowsTopAppBarOverride.TwoRowsTopAppBar
 import androidx.compose.material3.TopAppBarState.Companion.Saver
 import androidx.compose.material3.internal.FloatProducer
 import androidx.compose.material3.internal.ProvideContentColorTextStyle
@@ -1408,7 +1406,7 @@ private fun BottomAppBarLayout(
                         activeScrollBehavior.state,
                         velocity,
                         activeScrollBehavior.flingAnimationSpec,
-                        activeScrollBehavior.snapAnimationSpec
+                        activeScrollBehavior.snapAnimationSpec,
                     )
                 },
             )
@@ -2758,7 +2756,7 @@ val LocalSingleRowTopAppBarOverride: ProvidableCompositionLocal<SingleRowTopAppB
 @OptIn(
     ExperimentalMaterial3Api::class,
     ExperimentalMaterial3ExpressiveApi::class,
-    ExperimentalMaterial3ComponentOverrideApi::class
+    ExperimentalMaterial3ComponentOverrideApi::class,
 )
 @Composable
 private fun TwoRowsTopAppBar(
@@ -3587,7 +3585,7 @@ private fun rememberTouchExplorationService() =
     rememberAccessibilityServiceState(
         listenToTouchExplorationState = true,
         listenToSwitchAccessState = false,
-        listenToVoiceAccessState = false
+        listenToVoiceAccessState = false,
     )
 
 // An easing function used to compute the alpha value that is applied to the top title part of a

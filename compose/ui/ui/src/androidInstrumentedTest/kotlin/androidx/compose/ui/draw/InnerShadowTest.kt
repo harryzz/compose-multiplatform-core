@@ -20,17 +20,23 @@ import android.graphics.Bitmap
 import android.os.Build
 import androidx.activity.compose.setContent
 import androidx.annotation.RequiresApi
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.testutils.first
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.AtLeastSize
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.shadow.InnerShadow
+import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.platform.InspectableValue
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.ValueElement
 import androidx.compose.ui.platform.isDebugInspectorInfoEnabled
 import androidx.compose.ui.runOnUiThreadIR
@@ -87,6 +93,37 @@ class InnerShadowTest {
 
     @SdkSuppress(minSdkVersion = Build.VERSION_CODES.O)
     @Test
+    fun shadowRedrawnWhenValueChanges() {
+        var radiusDp by mutableStateOf(2.dp)
+        rule.runOnUiThread {
+            activity.setContent {
+                with(LocalDensity.current) {
+                    Box(modifier = Modifier.size(12.toDp()).background(Color.White)) {
+                        Box(
+                            Modifier.align(Alignment.Center)
+                                .size(8.toDp())
+                                .innerShadow(RectangleShape) { radius = radiusDp.toPx() }
+                                .drawBehind { drawLatch.countDown() }
+                        )
+                    }
+                }
+            }
+        }
+
+        assertTrue(drawLatch.await(1, TimeUnit.SECONDS))
+        takeScreenShot(12).apply { hasShadow() }
+        drawLatch = CountDownLatch(1)
+        radiusDp = 0.dp
+        assertTrue(drawLatch.await(1, TimeUnit.SECONDS))
+        takeScreenShot(12).apply { hasNoShadow() }
+        drawLatch = CountDownLatch(1)
+        radiusDp = 2.dp
+        assertTrue(drawLatch.await(1, TimeUnit.SECONDS))
+        takeScreenShot(12).apply { hasShadow() }
+    }
+
+    @SdkSuppress(minSdkVersion = Build.VERSION_CODES.O)
+    @Test
     fun shadowDrawnInsideRenderNode() {
         rule.runOnUiThreadIR {
             activity.setContent { ShadowContainer(modifier = Modifier.graphicsLayer()) }
@@ -123,7 +160,7 @@ class InnerShadowTest {
                 AtLeastSize(size = 12, modifier = Modifier.background(Color.White)) {
                     val shadow =
                         if (model.value) {
-                            Modifier.innerShadow(RectangleShape, InnerShadow(2.dp))
+                            Modifier.innerShadow(RectangleShape, Shadow(2.dp))
                         } else {
                             Modifier
                         }
@@ -143,13 +180,13 @@ class InnerShadowTest {
     fun testInspectorValue() {
         rule.runOnUiThreadIR {
             val modifier =
-                Modifier.innerShadow(RectangleShape, InnerShadow(8.dp)).first() as InspectableValue
+                Modifier.innerShadow(RectangleShape, Shadow(8.dp)).first() as InspectableValue
             assertThat(modifier.nameFallback).isEqualTo("innerShadow")
             assertThat(modifier.valueOverride).isNull()
             assertThat(modifier.inspectableElements.asIterable())
                 .containsExactly(
                     ValueElement("shape", RectangleShape),
-                    ValueElement("innerShadow", InnerShadow(8.dp)),
+                    ValueElement("innerShadow", Shadow(8.dp)),
                 )
         }
     }
@@ -162,7 +199,7 @@ class InnerShadowTest {
         AtLeastSize(size = 12, modifier = modifier.background(Color.White)) {
             AtLeastSize(
                 size = 8,
-                modifier = Modifier.innerShadow(RectangleShape, InnerShadow(radius.value)),
+                modifier = Modifier.innerShadow(RectangleShape, Shadow(radius.value)),
             ) {}
         }
     }
@@ -170,6 +207,13 @@ class InnerShadowTest {
     private fun Bitmap.hasShadow() {
         // Shadow drawn inside the 8 x 8 box centered in the 12 x 12 container
         assertNotEquals(Color.White, color(width / 2, 3))
+        // No shadow drawn outside the 8 x 8 box
+        assertEquals(Color.White, color(width / 2, 0))
+    }
+
+    private fun Bitmap.hasNoShadow() {
+        // No shadow drawn inside the 8 x 8 box centered in the 12 x 12 container
+        assertEquals(Color.White, color(width / 2, 3))
         // No shadow drawn outside the 8 x 8 box
         assertEquals(Color.White, color(width / 2, 0))
     }

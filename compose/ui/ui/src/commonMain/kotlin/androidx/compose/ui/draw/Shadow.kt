@@ -28,18 +28,17 @@ import androidx.compose.ui.graphics.GraphicsLayerScope
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.ContentDrawScope
-import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.isSpecified
-import androidx.compose.ui.graphics.shadow.DropShadow
 import androidx.compose.ui.graphics.shadow.DropShadowPainter
-import androidx.compose.ui.graphics.shadow.InnerShadow
 import androidx.compose.ui.graphics.shadow.InnerShadowPainter
+import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.internal.JvmDefaultWithCompatibility
 import androidx.compose.ui.node.DrawModifierNode
 import androidx.compose.ui.node.ModifierNodeElement
 import androidx.compose.ui.node.ObserverModifierNode
 import androidx.compose.ui.node.invalidateDraw
+import androidx.compose.ui.node.observeReads
 import androidx.compose.ui.node.requireDensity
 import androidx.compose.ui.node.requireGraphicsContext
 import androidx.compose.ui.platform.InspectorInfo
@@ -124,23 +123,19 @@ fun Modifier.shadow(
 
 /**
  * Draws a drop shadow behind the rest of the content with the geometry specified by the given shape
- * and the shadow properties defined by the [DropShadow]. This is different than [Modifier.shadow]
- * as this does not introduce a graphicsLayer to render elevation based shadows. This shadow is
+ * and the shadow properties defined by the [Shadow]. This is different than [Modifier.shadow] as
+ * this does not introduce a graphicsLayer to render elevation based shadows. This shadow is
  * rendered without a single light source and will render consistently regardless of the on screen
  * position of the content.
  *
- * @param shape Defines the geometry of the shadow
- * @param dropShadow Specify the properties of the shadow like radius, spread, and fill properties
- *   like the color or brush
- * @param offset Optional offset parameter that the shadow should be translated by
+ * @param shape Geometry of the shadow
+ * @param shadow Properties of the shadow like radius, spread, offset, and fill properties like the
+ *   color or brush
  * @sample androidx.compose.ui.samples.DropShadowSample
  */
 @Stable
-fun Modifier.dropShadow(
-    shape: Shape,
-    dropShadow: DropShadow,
-    offset: DpOffset = DpOffset.Zero,
-): Modifier = this then SimpleDropShadowElement(shape, dropShadow, offset)
+fun Modifier.dropShadow(shape: Shape, shadow: Shadow): Modifier =
+    this then SimpleDropShadowElement(shape, shadow)
 
 /**
  * Draws a drop shadow behind the rest of the content with the geometry specified by the given shape
@@ -151,8 +146,8 @@ fun Modifier.dropShadow(
  * drop shadow parameters is done with the lambda with [DropShadowScope] allows for more efficient
  * transformations for animated use cases without recomposition.
  *
- * @param shape Defines the geometry of the shadow
- * @param block block on [DropShadowScope] where you define the shadow properties.
+ * @param shape Geometry of the shadow
+ * @param block [DropShadowScope] block where shadow properties are defined
  * @sample androidx.compose.ui.samples.DropShadowSample
  */
 @Stable
@@ -161,20 +156,20 @@ fun Modifier.dropShadow(shape: Shape, block: DropShadowScope.() -> Unit) =
 
 /**
  * Draws an inner shadow on top of the rest of the content with the geometry specified by the given
- * shape and the shadow properties defined by the [InnerShadow]. This is different than
- * [Modifier.shadow] as this does not introduce a graphicsLayer to render elevation based shadows.
- * Additionally this shadow will render only within the geometry and can be used to provide a
- * recessed like visual effect. This shadow is rendered without a single light source and will
- * render consistently regardless of the on screen position of the content.
+ * shape and the shadow properties defined by the [Shadow]. This is different than [Modifier.shadow]
+ * as this does not introduce a graphicsLayer to render elevation based shadows. Additionally this
+ * shadow will render only within the geometry and can be used to provide a recessed like visual
+ * effect. This shadow is rendered without a single light source and will render consistently
+ * regardless of the on screen position of the content.
  *
- * @param shape Defines the geometry of the shape
- * @param innerShadow Specify the properties of the shadow like radius, spread, offset and fill
- *   properties like the color or brush
+ * @param shape Geometry of the shadow
+ * @param shadow Properties of the shadow like radius, spread, offset, and fill properties like the
+ *   color or brush
  * @sample androidx.compose.ui.samples.InnerShadowSample
  */
 @Stable
-fun Modifier.innerShadow(shape: Shape, innerShadow: InnerShadow): Modifier =
-    this then SimpleInnerShadowElement(shape, innerShadow)
+fun Modifier.innerShadow(shape: Shape, shadow: Shadow): Modifier =
+    this then SimpleInnerShadowElement(shape, shadow)
 
 /**
  * Draws an inner shadow behind the rest of the content with the geometry specified by the given
@@ -185,8 +180,8 @@ fun Modifier.innerShadow(shape: Shape, innerShadow: InnerShadow): Modifier =
  * specification of inner shadow parameters is done with the lambda with [InnerShadowScope] allows
  * for more efficient transformations for animated use cases without recomposition.
  *
- * @param shape Defines the geometry of the shadow
- * @param block block on [InnerShadowScope] where you define the shadow properties.
+ * @param shape Geometry of the shadow
+ * @param block [InnerShadowScope] block where shadow properties are defined
  * @sample androidx.compose.ui.samples.InnerShadowSample
  */
 @Stable
@@ -273,23 +268,19 @@ internal class BlockDropShadowElement(val shape: Shape, val block: DropShadowSco
     override fun hashCode() = 31 * shape.hashCode() + block.hashCode()
 }
 
-internal data class SimpleDropShadowElement(
-    val shape: Shape,
-    val dropShadow: DropShadow,
-    val offset: DpOffset,
-) : ModifierNodeElement<SimpleDropShadowNode>() {
+internal data class SimpleDropShadowElement(val shape: Shape, val shadow: Shadow) :
+    ModifierNodeElement<SimpleDropShadowNode>() {
 
-    override fun create(): SimpleDropShadowNode = SimpleDropShadowNode(shape, dropShadow, offset)
+    override fun create(): SimpleDropShadowNode = SimpleDropShadowNode(shape, shadow)
 
     override fun update(node: SimpleDropShadowNode) {
-        node.update(shape, dropShadow, offset)
+        node.update(shape, shadow)
     }
 
     override fun InspectorInfo.inspectableProperties() {
         name = "dropShadow"
         properties["shape"] = shape
-        properties["dropShadow"] = dropShadow
-        properties["offset"] = offset
+        properties["dropShadow"] = shadow
     }
 }
 
@@ -297,33 +288,28 @@ internal data class SimpleDropShadowElement(
  * DropShadow ModifierNode implementation that leverages an immutable DropShadow and offset. This is
  * useful for use cases where the shadow itself is not animated
  */
-internal class SimpleDropShadowNode(
-    private var shape: Shape,
-    private var dropShadow: DropShadow,
-    private var offset: DpOffset,
-) : DrawModifierNode, Modifier.Node(), ObserverModifierNode {
+internal class SimpleDropShadowNode(private var shape: Shape, private var shadow: Shadow) :
+    DrawModifierNode, Modifier.Node(), ObserverModifierNode {
 
     private var shadowPainter: DropShadowPainter? = null
 
-    fun update(shape: Shape, dropShadow: DropShadow, offset: DpOffset) {
-        val painterInvalidated = this.shape != shape || this.dropShadow != dropShadow
+    fun update(shape: Shape, shadow: Shadow) {
+        val painterInvalidated = this.shape != shape || this.shadow != shadow
         if (painterInvalidated) {
             shadowPainter = null
         }
         this.shape = shape
-        this.dropShadow = dropShadow
-        this.offset = offset
+        this.shadow = shadow
     }
 
     private fun obtainPainter(): DropShadowPainter =
         shadowPainter
-            ?: requireGraphicsContext()
-                .shadowContext
-                .createDropShadowPainter(shape, dropShadow)
-                .also { shadowPainter = it }
+            ?: requireGraphicsContext().shadowContext.createDropShadowPainter(shape, shadow).also {
+                shadowPainter = it
+            }
 
     override fun ContentDrawScope.draw() {
-        translate(offset.x.toPx(), offset.y.toPx()) { with(obtainPainter()) { draw(size) } }
+        with(obtainPainter()) { draw(size) }
         drawContent()
     }
 
@@ -337,33 +323,31 @@ internal class SimpleDropShadowNode(
         if (other == null || other !is SimpleDropShadowNode) return false
 
         if (shape != other.shape) return false
-        if (dropShadow != other.dropShadow) return false
-        if (offset != other.offset) return false
+        if (shadow != other.shadow) return false
 
         return true
     }
 
     override fun hashCode(): Int {
         var result = shape.hashCode()
-        result = 31 * result + dropShadow.hashCode()
-        result = 31 * result + offset.hashCode()
+        result = 31 * result + shadow.hashCode()
         return result
     }
 }
 
-internal data class SimpleInnerShadowElement(val shape: Shape, val innerShadow: InnerShadow) :
+internal data class SimpleInnerShadowElement(val shape: Shape, val shadow: Shadow) :
     ModifierNodeElement<SimpleInnerShadowNode>() {
 
-    override fun create(): SimpleInnerShadowNode = SimpleInnerShadowNode(shape, innerShadow)
+    override fun create(): SimpleInnerShadowNode = SimpleInnerShadowNode(shape, shadow)
 
     override fun update(node: SimpleInnerShadowNode) {
-        node.update(shape, innerShadow)
+        node.update(shape, shadow)
     }
 
     override fun InspectorInfo.inspectableProperties() {
         name = "innerShadow"
         properties["shape"] = shape
-        properties["innerShadow"] = innerShadow
+        properties["innerShadow"] = shadow
     }
 }
 
@@ -371,28 +355,25 @@ internal data class SimpleInnerShadowElement(val shape: Shape, val innerShadow: 
  * InnerShadow ModifierNode implementation that leverages an immutable InnerShadow and offset. This
  * is useful for use cases where the shadow itself is not animated
  */
-internal class SimpleInnerShadowNode(
-    private var shape: Shape,
-    private var innerShadow: InnerShadow,
-) : DrawModifierNode, Modifier.Node(), ObserverModifierNode {
+internal class SimpleInnerShadowNode(private var shape: Shape, private var shadow: Shadow) :
+    DrawModifierNode, Modifier.Node(), ObserverModifierNode {
 
     private var innerShadowPainter: InnerShadowPainter? = null
 
-    fun update(shape: Shape, innerShadow: InnerShadow) {
-        val painterInvalidated = this.shape != shape || this.innerShadow != innerShadow
+    fun update(shape: Shape, shadow: Shadow) {
+        val painterInvalidated = this.shape != shape || this.shadow != shadow
         if (painterInvalidated) {
             innerShadowPainter = null
         }
         this.shape = shape
-        this.innerShadow = innerShadow
+        this.shadow = shadow
     }
 
     private fun obtainPainter(): InnerShadowPainter =
         innerShadowPainter
-            ?: requireGraphicsContext()
-                .shadowContext
-                .createInnerShadowPainter(shape, innerShadow)
-                .also { innerShadowPainter = it }
+            ?: requireGraphicsContext().shadowContext.createInnerShadowPainter(shape, shadow).also {
+                innerShadowPainter = it
+            }
 
     override fun ContentDrawScope.draw() {
         with(obtainPainter()) { draw(size) }
@@ -411,14 +392,14 @@ internal class SimpleInnerShadowNode(
         other as SimpleInnerShadowNode
 
         if (shape != other.shape) return false
-        if (innerShadow != other.innerShadow) return false
+        if (shadow != other.shadow) return false
 
         return true
     }
 
     override fun hashCode(): Int {
         var result = shape.hashCode()
-        result = 31 * result + innerShadow.hashCode()
+        result = 31 * result + shadow.hashCode()
         return result
     }
 }
@@ -460,13 +441,17 @@ internal class BlockInnerShadowNode(private var shape: Shape, block: InnerShadow
     DrawModifierNode, Modifier.Node(), ObserverModifierNode, InnerShadowScope {
 
     private var densityObject: Density? = null
-    private var targetShadow: InnerShadow? = null
+    private var targetShadow: Shadow? = null
     private var shadowPainter: InnerShadowPainter? = null
+    private var blockRead = false
 
     private var block: InnerShadowScope.() -> Unit = block
         set(value) {
-            field = value
-            field.invoke(this)
+            if (field !== value) {
+                field = value
+                blockRead = false
+                invalidateDraw()
+            }
         }
 
     override val density: Float
@@ -539,10 +524,6 @@ internal class BlockInnerShadowNode(private var shape: Shape, block: InnerShadow
             }
         }
 
-    init {
-        block.invoke(this)
-    }
-
     override fun onAttach() {
         super.onAttach()
         updateDensity()
@@ -572,6 +553,10 @@ internal class BlockInnerShadowNode(private var shape: Shape, block: InnerShadow
     }
 
     private fun obtainPainter(): InnerShadowPainter {
+        if (!blockRead) {
+            blockRead = true
+            observeReads { block(this) }
+        }
         var shadow = targetShadow
         var painter = shadowPainter
         val tmpBrush = brush
@@ -591,9 +576,9 @@ internal class BlockInnerShadowNode(private var shape: Shape, block: InnerShadow
         ) {
             shadow =
                 if (tmpBrush != null) {
-                        InnerShadow(radiusDp, tmpBrush, spreadDp, dpOffset, alpha, blendMode)
+                        Shadow(radiusDp, tmpBrush, spreadDp, dpOffset, alpha, blendMode)
                     } else {
-                        InnerShadow(radiusDp, color, spreadDp, dpOffset, alpha, blendMode)
+                        Shadow(radiusDp, color, spreadDp, dpOffset, alpha, blendMode)
                     }
                     .also { targetShadow = it }
             painter =
@@ -607,6 +592,7 @@ internal class BlockInnerShadowNode(private var shape: Shape, block: InnerShadow
 
     override fun onObservedReadsChanged() {
         invalidateShadow()
+        blockRead = false
     }
 
     private fun invalidateShadow() {
@@ -655,12 +641,16 @@ internal class BlockDropShadowNode(private var shape: Shape, block: DropShadowSc
     DrawModifierNode, Modifier.Node(), ObserverModifierNode, DropShadowScope {
 
     private var densityObject: Density? = null
-    private var targetShadow: DropShadow? = null
+    private var targetShadow: Shadow? = null
     private var shadowPainter: DropShadowPainter? = null
+    private var blockRead = false
     private var block: DropShadowScope.() -> Unit = block
         set(value) {
-            field = value
-            field.invoke(this)
+            if (field !== value) {
+                field = value
+                blockRead = false
+                invalidateDraw()
+            }
         }
 
     override val density: Float
@@ -733,10 +723,6 @@ internal class BlockDropShadowNode(private var shape: Shape, block: DropShadowSc
             }
         }
 
-    init {
-        block.invoke(this)
-    }
-
     override fun onAttach() {
         super.onAttach()
         updateDensity()
@@ -761,16 +747,21 @@ internal class BlockDropShadowNode(private var shape: Shape, block: DropShadowSc
     }
 
     override fun ContentDrawScope.draw() {
-        translate(offset.x, offset.y) { with(obtainPainter()) { draw(size) } }
+        with(obtainPainter()) { draw(size) }
         drawContent()
     }
 
     private fun obtainPainter(): DropShadowPainter {
+        if (!blockRead) {
+            blockRead = true
+            observeReads { block() }
+        }
         var shadow = targetShadow
         var painter = shadowPainter
         val tmpBrush = brush
         val radiusDp = radius.toDp()
         val spreadDp = spread.toDp()
+        val dpOffset = DpOffset(offset.x.toDp(), offset.y.toDp())
         if (
             painter == null ||
                 shadow == null ||
@@ -779,13 +770,14 @@ internal class BlockDropShadowNode(private var shape: Shape, block: DropShadowSc
                 shadow.color != color ||
                 shadow.brush != tmpBrush ||
                 shadow.alpha != alpha ||
-                shadow.blendMode != blendMode
+                shadow.blendMode != blendMode ||
+                shadow.offset != dpOffset
         ) {
             shadow =
                 if (tmpBrush != null) {
-                        DropShadow(radiusDp, tmpBrush, spreadDp, alpha, blendMode)
+                        Shadow(radiusDp, tmpBrush, spreadDp, dpOffset, alpha, blendMode)
                     } else {
-                        DropShadow(radiusDp, color, spreadDp, alpha, blendMode)
+                        Shadow(radiusDp, color, spreadDp, dpOffset, alpha, blendMode)
                     }
                     .also { targetShadow = it }
             painter =
@@ -798,6 +790,7 @@ internal class BlockDropShadowNode(private var shape: Shape, block: DropShadowSc
 
     override fun onObservedReadsChanged() {
         invalidateShadow()
+        blockRead = false
     }
 
     private fun invalidateShadow() {
