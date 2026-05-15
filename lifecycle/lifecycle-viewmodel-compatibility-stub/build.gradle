@@ -35,6 +35,7 @@ androidXMultiplatform {
     mingwX64()
     js()
     wasmJs()
+    wasmWasi()
 
     defaultPlatform(PlatformIdentifier.ANDROID)
 
@@ -45,7 +46,39 @@ androidXMultiplatform {
                 api("androidx.lifecycle:lifecycle-viewmodel:$version")
             }
         }
+        wasmWasiUpstreamCommon {
+            dependsOn(commonMain)
+            kotlin.srcDirs += [
+                "$rootDir/lifecycle/lifecycle-viewmodel/src/commonMain/kotlin",
+            ]
+            dependencies {
+                api(libs.kotlinCoroutinesCore)
+            }
+            languageSettings {
+                optIn("kotlin.contracts.ExperimentalContracts")
+            }
+        }
+        wasmWasiMain {
+            dependsOn(wasmWasiUpstreamCommon)
+            kotlin.srcDirs += [
+                "$rootDir/lifecycle/lifecycle-viewmodel/src/nonJvmMain/kotlin",
+                "$rootDir/lifecycle/lifecycle-viewmodel/src/webMain/kotlin",
+            ]
+            dependencies {
+                api("org.jetbrains.compose.annotation-internal:annotation-wasm-wasi:9999.0.0-SNAPSHOT")
+                implementation("org.jetbrains.compose.collection-internal:collection-wasm-wasi:9999.0.0-SNAPSHOT")
+            }
+            languageSettings {
+                optIn("kotlin.contracts.ExperimentalContracts")
+            }
+        }
     }
+}
+
+configurations.matching { it.name.startsWith("wasmWasi") }.all {
+    exclude group: "androidx.lifecycle", module: "lifecycle-viewmodel"
+    exclude group: "androidx.annotation", module: "annotation"
+    exclude group: "androidx.collection", module: "collection"
 }
 
 androidx {

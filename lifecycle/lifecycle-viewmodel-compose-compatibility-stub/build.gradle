@@ -44,6 +44,7 @@ androidXMultiplatform {
     mingwX64()
     js()
     wasmJs()
+    wasmWasi()
 
     defaultPlatform(PlatformIdentifier.ANDROID)
 
@@ -62,7 +63,45 @@ androidXMultiplatform {
                 api(project(":compose:runtime:runtime-saveable"))
             }
         }
+        wasmWasiUpstreamCommon {
+            dependsOn(commonMain)
+            kotlin.srcDirs += [
+                "$rootDir/lifecycle/lifecycle-viewmodel-compose/src/commonMain/kotlin",
+            ]
+        }
+        wasmWasiMain {
+            dependsOn(wasmWasiUpstreamCommon)
+            kotlin {
+                srcDirs += [
+                    "$rootDir/lifecycle/lifecycle-viewmodel-compose/src/nonJvmMain/kotlin",
+                ]
+                exclude("**/*.nonJvm.kt")
+            }
+            dependencies {
+                // lifecycle-runtime-compose isn't a project dep — pull from m2.
+                implementation("org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose-wasm-wasi:9999.0.0-SNAPSHOT")
+            }
+        }
     }
+}
+
+configurations.matching { it.name.startsWith("wasmWasi") }.all {
+    exclude group: "androidx.lifecycle", module: "lifecycle-viewmodel-compose"
+    exclude group: "androidx.lifecycle", module: "lifecycle-viewmodel-savedstate"
+    exclude group: "androidx.lifecycle", module: "lifecycle-viewmodel"
+    exclude group: "androidx.lifecycle", module: "lifecycle-common"
+    exclude group: "androidx.lifecycle", module: "lifecycle-runtime-compose"
+    exclude group: "androidx.lifecycle", module: "lifecycle-runtime"
+    exclude group: "androidx.compose.runtime", module: "runtime-saveable"
+    exclude group: "androidx.compose.runtime", module: "runtime"
+    exclude group: "androidx.annotation", module: "annotation"
+    exclude group: "androidx.collection", module: "collection"
+    exclude group: "androidx.savedstate", module: "savedstate"
+    // Transitive m2 duplicates collide with our project(...) deps' local klibs.
+    exclude group: "org.jetbrains.compose.runtime", module: "runtime"
+    exclude group: "org.jetbrains.androidx.lifecycle", module: "lifecycle-viewmodel"
+    // Do NOT exclude lifecycle-common — needed via m2 for lifecycle-runtime-compose
+    // transitive resolution (LifecycleOwner reference in RememberViewModelStoreProvider).
 }
 
 androidx {

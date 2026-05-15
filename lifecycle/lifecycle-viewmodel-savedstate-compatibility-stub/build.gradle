@@ -20,6 +20,7 @@ import androidx.build.PlatformIdentifier
 plugins {
     id("AndroidXPlugin")
     id("JetBrainsAndroidXPlugin")
+    alias(libs.plugins.kotlinSerialization)
 }
 
 
@@ -36,6 +37,7 @@ androidXMultiplatform {
     mingwX64()
     js()
     wasmJs()
+    wasmWasi()
 
     defaultPlatform(PlatformIdentifier.ANDROID)
 
@@ -52,7 +54,46 @@ androidXMultiplatform {
                 api(project(":lifecycle:lifecycle-viewmodel"))
             }
         }
+        wasmWasiUpstreamCommon {
+            dependsOn(commonMain)
+            kotlin.srcDirs += [
+                "$rootDir/lifecycle/lifecycle-viewmodel-savedstate/src/commonMain/kotlin",
+            ]
+            dependencies {
+                api(libs.kotlinCoroutinesCore)
+                api(libs.kotlinSerializationCore)
+            }
+        }
+        wasmWasiMain {
+            dependsOn(wasmWasiUpstreamCommon)
+            kotlin {
+                srcDirs += [
+                    "$rootDir/lifecycle/lifecycle-viewmodel-savedstate/src/nonAndroidMain/kotlin",
+                    "$rootDir/lifecycle/lifecycle-viewmodel-savedstate/src/webMain/kotlin",
+                ]
+                exclude("**/SavedStateHandle.nonAndroid.kt")
+            }
+            dependencies {
+                api("org.jetbrains.compose.annotation-internal:annotation-wasm-wasi:9999.0.0-SNAPSHOT")
+                implementation("org.jetbrains.compose.collection-internal:collection-wasm-wasi:9999.0.0-SNAPSHOT")
+                api("org.jetbrains.androidx.savedstate:savedstate-wasm-wasi:9999.0.0-SNAPSHOT")
+                implementation("org.jetbrains.androidx.lifecycle:lifecycle-common-wasm-wasi:9999.0.0-SNAPSHOT")
+                api("org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-wasm-wasi:9999.0.0-SNAPSHOT")
+            }
+        }
     }
+}
+
+configurations.matching { it.name.startsWith("wasmWasi") }.all {
+    exclude group: "androidx.lifecycle", module: "lifecycle-viewmodel-savedstate"
+    exclude group: "androidx.lifecycle", module: "lifecycle-common"
+    exclude group: "androidx.lifecycle", module: "lifecycle-viewmodel"
+    exclude group: "androidx.savedstate", module: "savedstate"
+    exclude group: "androidx.annotation", module: "annotation"
+    exclude group: "androidx.collection", module: "collection"
+    exclude group: "org.jetbrains.androidx.savedstate", module: "savedstate"
+    exclude group: "org.jetbrains.androidx.lifecycle", module: "lifecycle-common"
+    exclude group: "org.jetbrains.androidx.lifecycle", module: "lifecycle-viewmodel"
 }
 
 androidx {

@@ -33,6 +33,7 @@ androidXMultiplatform {
     ios()
     js()
     wasmJs()
+    wasmWasi()
 
     defaultPlatform(PlatformIdentifier.ANDROID)
 
@@ -95,6 +96,27 @@ androidXMultiplatform {
         webTest {
             dependsOn(jbTest)
         }
+
+        wasmWasiMain {
+            dependsOn(jbMain)
+            dependencies {
+                implementation("org.jetbrains.androidx.navigationevent:navigationevent-compose-wasm-wasi:9999.0.0-SNAPSHOT")
+            }
+        }
+    }
+}
+
+configurations.matching { it.name.startsWith("wasmWasi") }.all {
+    exclude group: "androidx.collection", module: "collection"
+    exclude group: "androidx.annotation", module: "annotation"
+    exclude group: "androidx.navigationevent", module: "navigationevent-compose"
+    resolutionStrategy.dependencySubstitution {
+        substitute(module("org.jetbrains.compose.collection-internal:collection")).using(
+            module("org.jetbrains.compose.collection-internal:collection:9999.0.0-SNAPSHOT")
+        )
+        substitute(module("org.jetbrains.compose.annotation-internal:annotation")).using(
+            module("org.jetbrains.compose.annotation-internal:annotation:9999.0.0-SNAPSHOT")
+        )
     }
 }
 

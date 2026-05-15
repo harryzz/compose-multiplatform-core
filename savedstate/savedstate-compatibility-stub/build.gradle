@@ -12,6 +12,7 @@ import androidx.build.PlatformIdentifier
 plugins {
     id("AndroidXPlugin")
     id("JetBrainsAndroidXPlugin")
+    alias(libs.plugins.kotlinSerialization)
 }
 
 androidXMultiplatform {
@@ -32,6 +33,7 @@ androidXMultiplatform {
     mingwX64()
     js()
     wasmJs()
+    wasmWasi()
 
     defaultPlatform(PlatformIdentifier.ANDROID)
 
@@ -46,7 +48,56 @@ androidXMultiplatform {
                 implementation("org.jetbrains.androidx.lifecycle:lifecycle-common:2.9.6")
             }
         }
+        wasmWasiUpstreamCommon {
+            dependsOn(commonMain)
+            kotlin.srcDirs += [
+                "$rootDir/savedstate/savedstate/src/commonMain/kotlin",
+            ]
+            dependencies {
+                api(libs.kotlinCoroutinesCore)
+                api(libs.kotlinSerializationCore)
+            }
+            languageSettings {
+                optIn("kotlin.contracts.ExperimentalContracts")
+            }
+        }
+        wasmWasiMain {
+            dependsOn(wasmWasiUpstreamCommon)
+            kotlin {
+                srcDirs += [
+                    "$rootDir/savedstate/savedstate/src/nonAndroidMain/kotlin",
+                    "$rootDir/savedstate/savedstate/src/webMain/kotlin",
+                ]
+                // Upstream nonAndroidMain files use JVM annotations
+                // (@JvmName, @JvmStatic, @JvmInline) that Kotlin 2.4 forbids
+                // outside commonMain. Patched copies live in src/wasmWasiMain.
+                exclude("**/SavedState.nonAndroid.kt")
+                exclude("**/SavedStateReader.nonAndroid.kt")
+                exclude("**/SavedStateRegistry.nonAndroid.kt")
+                exclude("**/SavedStateRegistryController.nonAndroid.kt")
+                exclude("**/SavedStateWriter.nonAndroid.kt")
+            }
+            dependencies {
+                api("org.jetbrains.compose.annotation-internal:annotation-wasm-wasi:9999.0.0-SNAPSHOT")
+                implementation("org.jetbrains.compose.collection-internal:collection-wasm-wasi:9999.0.0-SNAPSHOT")
+                implementation("org.jetbrains.androidx.lifecycle:lifecycle-common-wasm-wasi:9999.0.0-SNAPSHOT")
+            }
+            languageSettings {
+                optIn("kotlin.contracts.ExperimentalContracts")
+            }
+        }
     }
+}
+
+configurations.matching { it.name.startsWith("wasmWasi") }.all {
+    exclude group: "androidx.savedstate", module: "savedstate"
+    exclude group: "androidx.annotation", module: "annotation"
+    exclude group: "androidx.collection", module: "collection"
+    // Both the upstream and JetBrains' published lifecycle-common lack a
+    // wasm-wasi variant; substitute our locally-published klib via the
+    // explicit wasmWasiMain.dependencies block above.
+    exclude group: "androidx.lifecycle", module: "lifecycle-common"
+    exclude group: "org.jetbrains.androidx.lifecycle", module: "lifecycle-common"
 }
 
 androidx {

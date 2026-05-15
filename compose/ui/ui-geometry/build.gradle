@@ -39,6 +39,7 @@ androidXMultiplatform {
     ios()
     js()
     wasmJs()
+    wasmWasi()
 
     defaultPlatform(PlatformIdentifier.ANDROID)
 
@@ -78,5 +79,15 @@ androidx {
     inceptionYear = "2020"
     description = "Compose classes related to dimensions without units"
     legacyDisableKotlinStrictApiMode = true
+}
+
+configurations.matching { it.name.startsWith("wasmWasi") }.all {
+    exclude group: "androidx.collection", module: "collection"
+    exclude group: "androidx.annotation", module: "annotation"
+    resolutionStrategy.dependencySubstitution {
+        substitute(module("org.jetbrains.compose.collection-internal:collection")).using(
+            module("org.jetbrains.compose.collection-internal:collection:9999.0.0-SNAPSHOT")
+        )
+    }
 }
 

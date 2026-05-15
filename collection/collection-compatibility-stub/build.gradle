@@ -31,6 +31,7 @@ androidXMultiplatform {
     mingwX64()
     tvos()
     wasmJs()
+    wasmWasi()
     watchos()
 
     defaultPlatform(PlatformIdentifier.JVM)
@@ -42,7 +43,60 @@ androidXMultiplatform {
                 api("androidx.collection:collection:$version")
             }
         }
+        // wasmWasi: no published variant exists. Build from local source by
+        // pulling collection/collection's sources via an intermediate sourceset
+        // so expect (commonMain) and actual (nonJvm/web) live in separate sets.
+        wasmWasiUpstreamCommon {
+            dependsOn(commonMain)
+            kotlin.srcDirs += [
+                "$rootDir/collection/collection/src/commonMain/kotlin",
+            ]
+            languageSettings {
+                optIn("kotlin.contracts.ExperimentalContracts")
+            }
+        }
+        wasmWasiMain {
+            // KGP emits a "redundant dependsOn" warning here, but the warning
+            // is misleading — without this edge, wasmWasiMain cannot see
+            // wasmWasiUpstreamCommon's content (upstream commonMain expects),
+            // and every actual fails with "no corresponding expected declaration".
+            dependsOn(wasmWasiUpstreamCommon)
+            dependencies {
+                // Pulls in androidx.annotation.{IntRange,RestrictTo,…}. Without
+                // this we'd have to bundle a local Annotations.kt stub here,
+                // which would duplicate IntRange when linked alongside
+                // annotation-wasm-wasi (and trip "IrClassSymbolImpl is already
+                // bound" at the consumer link step).
+                api("org.jetbrains.compose.annotation-internal:annotation-wasm-wasi:9999.0.0-SNAPSHOT")
+            }
+            kotlin {
+                srcDirs += [
+                    "$rootDir/collection/collection/src/nonJvmMain/kotlin",
+                    "$rootDir/collection/collection/src/webMain/kotlin",
+                ]
+                // These two upstream files apply JVM annotations
+                // (@JvmField/@JvmSynthetic/@JvmOverloads — all @OptionalExpectation)
+                // to actual declarations. Kotlin 2.4 forbids @OptionalExpectation
+                // outside commonMain. Patched copies live in src/wasmWasiMain/kotlin.
+                exclude("**/SparseArrayCompat.nonJvm.kt")
+                exclude("**/LongSparseArray.nonJvm.kt")
+            }
+            languageSettings {
+                optIn("kotlin.contracts.ExperimentalContracts")
+            }
+        }
     }
+}
+
+// commonMain `api(androidx.collection:collection)` propagates to wasmWasi,
+// but no wasmWasi variant is published. Exclude it from wasmWasi configurations
+// since we build the equivalent from source via srcDirs above.
+configurations.matching { it.name.startsWith("wasmWasi") }.all {
+    exclude group: "androidx.collection", module: "collection"
+    // annotation-wasm-wasi.pom transitively pulls androidx.annotation:annotation
+    // (no wasi variant). The classes it would have provided are already inside
+    // annotation-wasm-wasi.klib.
+    exclude group: "androidx.annotation", module: "annotation"
 }
 
 androidx {

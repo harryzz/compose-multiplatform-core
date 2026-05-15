@@ -45,6 +45,7 @@ androidXMultiplatform {
     mingwX64()
     js()
     wasmJs()
+    wasmWasi()
 
     defaultPlatform(PlatformIdentifier.ANDROID)
 
@@ -58,8 +59,52 @@ androidXMultiplatform {
             // new redirections to Google's artifacts.
             api(project(":compose:runtime:runtime"))
         }
-
+        wasmWasiUpstreamCommon {
+            dependsOn(commonMain)
+            kotlin.srcDirs += [
+                "$rootDir/navigationevent/navigationevent-compose/src/commonMain/kotlin",
+                // navigationevent base module isn't registered — pull its
+                // source straight in so navigationevent.* refs resolve.
+                "$rootDir/navigationevent/navigationevent/src/commonMain/kotlin",
+                // runtime-annotation classes (Stable/Immutable/etc.) already
+                // shipped by org.jetbrains.compose.runtime:runtime-wasm-wasi —
+                // pulling them here too would duplicate IR symbols and trip
+                // the linker with "IrClassSymbolImpl is already bound".
+            ]
+            dependencies {
+                api(libs.kotlinCoroutinesCore)
+            }
+            languageSettings {
+                optIn("kotlin.contracts.ExperimentalContracts")
+            }
+        }
+        wasmWasiMain {
+            dependsOn(wasmWasiUpstreamCommon)
+            kotlin {
+                srcDirs += [
+                    "$rootDir/navigationevent/navigationevent-compose/src/nonJvmMain/kotlin",
+                    "$rootDir/navigationevent/navigationevent/src/webMain/kotlin",
+                ]
+                exclude("**/*.nonJvm.kt")
+            }
+            dependencies {
+                api("org.jetbrains.compose.annotation-internal:annotation-wasm-wasi:9999.0.0-SNAPSHOT")
+                implementation("org.jetbrains.compose.collection-internal:collection-wasm-wasi:9999.0.0-SNAPSHOT")
+            }
+            languageSettings {
+                optIn("kotlin.contracts.ExperimentalContracts")
+            }
+        }
     }
+}
+
+configurations.matching { it.name.startsWith("wasmWasi") }.all {
+    exclude group: "androidx.navigationevent", module: "navigationevent-compose"
+    exclude group: "androidx.navigationevent", module: "navigationevent"
+    exclude group: "androidx.compose.runtime", module: "runtime"
+    exclude group: "androidx.compose.runtime", module: "runtime-annotation"
+    exclude group: "androidx.annotation", module: "annotation"
+    exclude group: "androidx.collection", module: "collection"
 }
 
 androidx {

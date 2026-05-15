@@ -36,6 +36,7 @@ androidXMultiplatform {
     watchos()
     js()
     wasmJs()
+    wasmWasi()
 
     defaultPlatform(PlatformIdentifier.ANDROID)
 
@@ -52,7 +53,44 @@ androidXMultiplatform {
                 api("org.jetbrains.compose.runtime:runtime:1.9.3")
             }
         }
+        wasmWasiUpstreamCommon {
+            dependsOn(commonMain)
+            kotlin.srcDirs += [
+                "$rootDir/lifecycle/lifecycle-runtime-compose/src/commonMain/kotlin",
+            ]
+            dependencies {
+                api(libs.kotlinCoroutinesCore)
+            }
+        }
+        wasmWasiMain {
+            dependsOn(wasmWasiUpstreamCommon)
+            kotlin {
+                srcDirs += [
+                    "$rootDir/lifecycle/lifecycle-runtime-compose/src/nonAndroidMain/kotlin",
+                ]
+                exclude("**/LocalLifecycleOwner.nonAndroid.kt")
+            }
+            dependencies {
+                api("org.jetbrains.compose.runtime:runtime-wasm-wasi:9999.0.0-SNAPSHOT")
+                // lifecycle-runtime + lifecycle-common come via project(...) dep
+                // in commonMain — don't duplicate via m2 (causes klib unique_name
+                // collision).
+            }
+        }
     }
+}
+
+configurations.matching { it.name.startsWith("wasmWasi") }.all {
+    // Only exclude maven coordinates that have NO wasm-wasi variant; do NOT
+    // exclude our own org.jetbrains.androidx.lifecycle:* — those are the
+    // klibs we want on classpath via transitive resolution.
+    exclude group: "androidx.lifecycle", module: "lifecycle-runtime-compose"
+    exclude group: "androidx.lifecycle", module: "lifecycle-runtime"
+    exclude group: "androidx.lifecycle", module: "lifecycle-common"
+    exclude group: "androidx.compose.runtime", module: "runtime"
+    exclude group: "androidx.annotation", module: "annotation"
+    exclude group: "androidx.collection", module: "collection"
+    exclude group: "org.jetbrains.compose.runtime", module: "runtime"
 }
 
 androidx {

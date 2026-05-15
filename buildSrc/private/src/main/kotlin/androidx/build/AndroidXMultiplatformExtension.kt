@@ -688,6 +688,33 @@ abstract class AndroidXMultiplatformExtension(val project: Project) {
             block = block,
         )
 
+    /**
+     * Register the `wasmWasi` target — Kotlin/Wasm compiled against WASI Preview 2.
+     *
+     * Unlike wasmJs (which targets browsers via JS interop + karma), wasmWasi runs
+     * on standalone wasm runtimes (wasmtime). No browser, no karma, no node — we
+     * just produce a klib that downstream wasi modules consume. The non-web
+     * shape means we bypass `configureForkWebTarget` (which sets up
+     * browser/karma/binaryen/node).
+     */
+    @OptIn(ExperimentalWasmDsl::class)
+    @JvmOverloads
+    fun wasmWasi(block: Action<KotlinWasmTargetDsl>? = null): KotlinWasmTargetDsl? {
+        if (buildFeatures.isIsolatedProjectsEnabled()) return null
+        supportedPlatforms.add(PlatformIdentifier.WASM_WASI)
+        if (!project.enableWasmWasi()) return null
+        val target = kotlinExtension.wasmWasi {
+            binaries.library()
+            block?.execute(this)
+        }
+        // Force kotlin-stdlib-wasm-wasi to match the compiler's ABI level. Without
+        // this, some transitive maven dep can pin an older stdlib and cause:
+        //   "Kotlin/Wasm standard library has the ABI version (2.3.0) ...
+        //    compiler's current ABI compatibility level (2.4)"
+        project.configurePinnedKotlinLibraries(PlatformIdentifier.WASM_WASI)
+        return target
+    }
+
     @OptIn(ExperimentalKotlinGradlePluginApi::class)
     private fun KotlinMultiplatformExtension.applyAndroidXDefaultHierarchyTemplate() =
         applyDefaultHierarchyTemplate {
@@ -702,6 +729,11 @@ abstract class AndroidXMultiplatformExtension(val project: Project) {
                     group("web") {
                         withWasmJs()
                         withJs()
+                    }
+                    // wasmWasi is non-JVM but NOT a web target — separate group so
+                    // it inherits from nonJvm without pulling in browser code.
+                    group("wasmWasi") {
+                        withWasmWasi()
                     }
                 }
             }
@@ -859,15 +891,19 @@ internal fun Project.configurePinnedKotlinLibraries(platform: PlatformIdentifier
             when (platform) {
                 PlatformIdentifier.JS -> "js"
                 PlatformIdentifier.WASM_JS -> "wasm-js"
+                PlatformIdentifier.WASM_WASI -> "wasm-wasi"
                 else -> throw IllegalStateException("Unsupported platform: $platform")
             }
         val kotlinVersion = project.getVersionByName("kotlin")
         it.sourceSets.getByName("${platform.id}Main").dependencies {
             implementation("org.jetbrains.kotlin:kotlin-stdlib-$kotlinLibSuffix:$kotlinVersion")
         }
-        it.sourceSets.getByName("${platform.id}Test").dependencies {
-            implementation("org.jetbrains.kotlin:kotlin-stdlib-$kotlinLibSuffix:$kotlinVersion")
-            implementation("org.jetbrains.kotlin:kotlin-test-$kotlinLibSuffix:$kotlinVersion")
+        // wasmWasi has no test target wired in our fork.
+        if (platform != PlatformIdentifier.WASM_WASI) {
+            it.sourceSets.getByName("${platform.id}Test").dependencies {
+                implementation("org.jetbrains.kotlin:kotlin-stdlib-$kotlinLibSuffix:$kotlinVersion")
+                implementation("org.jetbrains.kotlin:kotlin-test-$kotlinLibSuffix:$kotlinVersion")
+            }
         }
     }
 }

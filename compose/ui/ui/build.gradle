@@ -64,6 +64,7 @@ androidXMultiplatform {
     ios()
     js()
     wasmJs()
+    wasmWasi()
 
     defaultPlatform(PlatformIdentifier.ANDROID)
 
@@ -293,6 +294,57 @@ androidXMultiplatform {
             implementation(libs.skikoJsWasmRuntime)
         }
 
+        wasmWasiMain {
+            // Mirror nativeMain — wasmWasi inherits skikoMain via nonJvmMain.
+            dependsOn(nonJvmMain)
+            dependencies {
+                api("org.jetbrains.skiko:skiko-wasm-wasi:0.0.0-SNAPSHOT")
+                // runtime-retain target-specific (no umbrella, so direct dep).
+                api("androidx.compose.runtime:runtime-retain-wasm-wasi:1.12.0-alpha02")
+            }
+            kotlin {
+                srcDirs += [
+                    "$rootDir/compose/ui/ui/src/webMain/kotlin",
+                ]
+                exclude("androidx/compose/ui/dom/**")
+                exclude("androidx/compose/ui/events/**")
+                exclude("androidx/compose/ui/window/**")
+                exclude("androidx/compose/ui/platform/accessibility/**")
+                exclude("androidx/compose/ui/viewinterop/Web*")
+                exclude("androidx/compose/ui/viewinterop/InteropView.web.kt")
+                exclude("androidx/compose/ui/draganddrop/WebDragAndDropManager.kt")
+                exclude("androidx/compose/ui/draganddrop/DragAndDropTransferData.web.kt")
+                exclude("androidx/compose/ui/draganddrop/DragAndDrop.web.kt")
+                exclude("androidx/compose/ui/node/WeakReference.web.kt")
+                exclude("androidx/compose/ui/internal/W3CDomExtensions.kt")
+                exclude("androidx/compose/ui/platform/BackingDomInput.kt")
+                exclude("androidx/compose/ui/platform/DomInputStrategy.kt")
+                exclude("androidx/compose/ui/platform/NativeInputEventsProcessor.kt")
+                exclude("androidx/compose/ui/platform/PlatformClipboard.web.kt")
+                exclude("androidx/compose/ui/platform/PlatformUriHandler.web.kt")
+                exclude("androidx/compose/ui/platform/WebTextInputService.kt")
+                exclude("androidx/compose/ui/platform/WebTextToolbar.web.kt")
+                exclude("androidx/compose/ui/platform/WebWakeLockManager.kt")
+                exclude("androidx/compose/ui/input/key/KeyEvent.web.kt")
+                exclude("androidx/compose/ui/input/pointer/PointerEvent.web.kt")
+                // Uses kotlin.js JS-interop APIs; not valid on wasmWasi.
+                exclude("androidx/compose/ui/platform/DefaultHapticFeedback.web.kt")
+                // skikoMain files that need APIs not present in our skia-safe
+                // wasmWasi shim (offscreen Surface, IRect/Region).
+                exclude("androidx/compose/ui/ImageComposeScene.skiko.kt")
+                exclude("androidx/compose/ui/semantics/SemanticsRegion.skiko.kt")
+                // Synchronization.skiko.kt has @Suppress warnings-as-error
+                // that fail on Kotlin 2.4. Our wasmWasi-specific actual lives
+                // alongside (delegates to sibling). Exclude upstream version.
+                exclude("androidx/compose/ui/platform/Synchronization.skiko.kt")
+            }
+            languageSettings {
+                optIn("androidx.compose.runtime.InternalComposeApi")
+                optIn("androidx.compose.runtime.ExperimentalComposeApi")
+                optIn("androidx.compose.runtime.snapshots.InternalSnapshotApi")
+            }
+        }
+
         // TODO: Align it with AOSP or make explicit
         configureEach {
             languageSettings.optIn("androidx.compose.ui.ExperimentalComposeUiApi")
@@ -474,4 +526,118 @@ tasks.desktopTest {
         excludeCategories("androidx.compose.ui.HeadlessTest")
     }
     jvmArgs("--add-opens=java.desktop/javax.swing=ALL-UNNAMED")
+}
+
+
+// Skip upstream skikoMain files that can't compile on wasmWasi (referenced
+// types not in our skia shim, or `@Suppress` directives that trigger
+// Kotlin 2.4 warning-as-error). Task-level source filter — kotlin.exclude on
+// our wasmWasiMain only applies to its own srcDirs, not inherited skikoMain.
+tasks.matching { it.name == "compileKotlinWasmWasi" }.configureEach { task ->
+    task.exclude("**/Synchronization.skiko.kt")
+    task.exclude("**/ImageComposeScene.skiko.kt")
+    task.exclude("**/SemanticsRegion.skiko.kt")
+    task.exclude("**/DefaultHapticFeedback.web.kt")
+}
+
+configurations.matching { it.name.startsWith("wasmWasi") }.all {
+    exclude group: "androidx.collection", module: "collection"
+    exclude group: "androidx.collection", module: "collection-ktx"
+    exclude group: "androidx.annotation", module: "annotation"
+    exclude group: "androidx.graphics", module: "graphics-path"
+    exclude group: "androidx.compose.ui", module: "ui"
+    exclude group: "androidx.compose.ui", module: "ui-graphics"
+    exclude group: "androidx.compose.ui", module: "ui-text"
+    exclude group: "androidx.compose.ui", module: "ui-unit"
+    exclude group: "androidx.compose.ui", module: "ui-util"
+    exclude group: "androidx.compose.runtime", module: "runtime"
+    exclude group: "androidx.compose.runtime", module: "runtime-saveable"
+    exclude group: "androidx.compose.runtime", module: "runtime-retain"
+    exclude group: "androidx.lifecycle", module: "lifecycle-runtime-compose"
+    exclude group: "androidx.lifecycle", module: "lifecycle-runtime"
+    exclude group: "androidx.lifecycle", module: "lifecycle-common"
+    exclude group: "androidx.savedstate", module: "savedstate-compose"
+    exclude group: "androidx.savedstate", module: "savedstate"
+    // Restore excludes for maven coords whose wasm-wasi variant doesn't
+    // exist upstream. Substitutes operate on JetBrains-namespace coords.
+    exclude group: "androidx.lifecycle", module: "lifecycle-viewmodel"
+    exclude group: "androidx.lifecycle", module: "lifecycle-viewmodel-savedstate"
+    exclude group: "androidx.window", module: "window"
+    exclude group: "androidx.window", module: "window-core"
+    exclude group: "androidx.activity", module: "activity"
+    exclude group: "androidx.activity", module: "activity-compose"
+    exclude group: "androidx.activity", module: "activity-ktx"
+    exclude group: "androidx.fragment", module: "fragment"
+    exclude group: "androidx.core", module: "core"
+    exclude group: "androidx.appcompat", module: "appcompat"
+    exclude group: "androidx.transition", module: "transition"
+    exclude group: "androidx.autofill", module: "autofill"
+    exclude group: "androidx.customview", module: "customview-poolingcontainer"
+    exclude group: "androidx.emoji2", module: "emoji2"
+    exclude group: "androidx.profileinstaller", module: "profileinstaller"
+    // m2 transitive copies that collide with project deps.
+    exclude group: "org.jetbrains.compose.runtime", module: "runtime"
+    resolutionStrategy.dependencySubstitution {
+        substitute(module("org.jetbrains.compose.collection-internal:collection")).using(
+            module("org.jetbrains.compose.collection-internal:collection:9999.0.0-SNAPSHOT")
+        )
+        substitute(module("org.jetbrains.compose.annotation-internal:annotation")).using(
+            module("org.jetbrains.compose.annotation-internal:annotation:9999.0.0-SNAPSHOT")
+        )
+        substitute(module("org.jetbrains.skiko:skiko")).using(
+            module("org.jetbrains.skiko:skiko-wasm-wasi:0.0.0-SNAPSHOT")
+        )
+        // Force our locally-published 9999.0.0-SNAPSHOT klibs over the
+        // pinned JetBrains versions (which lack wasm-wasi variants).
+        substitute(module("org.jetbrains.androidx.lifecycle:lifecycle-common")).using(
+            module("org.jetbrains.androidx.lifecycle:lifecycle-common:9999.0.0-SNAPSHOT")
+        )
+        substitute(module("org.jetbrains.androidx.lifecycle:lifecycle-runtime")).using(
+            module("org.jetbrains.androidx.lifecycle:lifecycle-runtime:9999.0.0-SNAPSHOT")
+        )
+        substitute(module("org.jetbrains.androidx.lifecycle:lifecycle-viewmodel")).using(
+            module("org.jetbrains.androidx.lifecycle:lifecycle-viewmodel:9999.0.0-SNAPSHOT")
+        )
+        substitute(module("org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-savedstate")).using(
+            module("org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-savedstate:9999.0.0-SNAPSHOT")
+        )
+        // Substitute to target-specific -wasm-wasi artifacts (the umbrella
+        // wasn't published for these compose-extension modules).
+        substitute(module("org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose")).using(
+            module("org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose-wasm-wasi:9999.0.0-SNAPSHOT")
+        )
+        substitute(module("org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose")).using(
+            module("org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose-wasm-wasi:9999.0.0-SNAPSHOT")
+        )
+        substitute(module("org.jetbrains.androidx.savedstate:savedstate")).using(
+            module("org.jetbrains.androidx.savedstate:savedstate:9999.0.0-SNAPSHOT")
+        )
+        substitute(module("org.jetbrains.androidx.savedstate:savedstate-compose")).using(
+            module("org.jetbrains.androidx.savedstate:savedstate-compose-wasm-wasi:9999.0.0-SNAPSHOT")
+        )
+        substitute(module("org.jetbrains.androidx.navigationevent:navigationevent-compose")).using(
+            module("org.jetbrains.androidx.navigationevent:navigationevent-compose-wasm-wasi:9999.0.0-SNAPSHOT")
+        )
+        // skikoMain block also pins `androidx.navigationevent:navigationevent-compose`
+        // directly (not the JetBrains namespace) — substitute that too.
+        substitute(module("androidx.navigationevent:navigationevent-compose")).using(
+            module("org.jetbrains.androidx.navigationevent:navigationevent-compose-wasm-wasi:9999.0.0-SNAPSHOT")
+        )
+        // Same for androidx.lifecycle:lifecycle-viewmodel-compose pinned in skikoMain.
+        substitute(module("androidx.lifecycle:lifecycle-viewmodel-compose")).using(
+            module("org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose-wasm-wasi:9999.0.0-SNAPSHOT")
+        )
+        substitute(module("androidx.lifecycle:lifecycle-viewmodel-savedstate")).using(
+            module("org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-savedstate:9999.0.0-SNAPSHOT")
+        )
+        substitute(module("org.jetbrains.androidx.navigation:navigation-common")).using(
+            module("org.jetbrains.androidx.navigation:navigation-common-wasm-wasi:9999.0.0-SNAPSHOT")
+        )
+        substitute(module("org.jetbrains.androidx.navigation:navigation-runtime")).using(
+            module("org.jetbrains.androidx.navigation:navigation-runtime-wasm-wasi:9999.0.0-SNAPSHOT")
+        )
+        substitute(module("org.jetbrains.androidx.window:window-core")).using(
+            module("org.jetbrains.androidx.window:window-core-wasm-wasi:9999.0.0-SNAPSHOT")
+        )
+    }
 }

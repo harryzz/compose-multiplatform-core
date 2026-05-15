@@ -1,0 +1,22 @@
+/*
+ * Plain-stdlib actual of PlatformStringDelegate (the upstream interface uses
+ * compose's intl.Locale not java.util.Locale). On wasmWasi we ignore locale
+ * and use Kotlin's locale-insensitive transformations.
+ */
+@file:Suppress("UNUSED_PARAMETER")
+
+package androidx.compose.ui.text.platform
+
+import androidx.compose.ui.text.PlatformStringDelegate
+import androidx.compose.ui.text.intl.Locale as ComposeLocale
+
+internal actual fun ActualStringDelegate(): PlatformStringDelegate = WasiStringDelegate
+
+private object WasiStringDelegate : PlatformStringDelegate {
+    override fun toUpperCase(string: String, locale: ComposeLocale): String = string.uppercase()
+    override fun toLowerCase(string: String, locale: ComposeLocale): String = string.lowercase()
+    override fun capitalize(string: String, locale: ComposeLocale): String =
+        string.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+    override fun decapitalize(string: String, locale: ComposeLocale): String =
+        string.replaceFirstChar { it.lowercase() }
+}

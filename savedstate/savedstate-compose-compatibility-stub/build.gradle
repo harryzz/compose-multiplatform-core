@@ -20,6 +20,7 @@ import androidx.build.PlatformIdentifier
 plugins {
     id("AndroidXPlugin")
     id("JetBrainsAndroidXPlugin")
+    alias(libs.plugins.kotlinSerialization)
 }
 androidXMultiplatform {
     androidLibrary {
@@ -34,6 +35,7 @@ androidXMultiplatform {
     watchos()
     js()
     wasmJs()
+    wasmWasi()
 
     defaultPlatform(PlatformIdentifier.ANDROID)
 
@@ -49,7 +51,42 @@ androidXMultiplatform {
                 api("org.jetbrains.compose.runtime:runtime:1.9.3")
             }
         }
+        wasmWasiUpstreamCommon {
+            dependsOn(commonMain)
+            kotlin.srcDirs += [
+                "$rootDir/savedstate/savedstate-compose/src/commonMain/kotlin",
+            ]
+            dependencies {
+                api(libs.kotlinSerializationCore)
+            }
+        }
+        wasmWasiMain {
+            dependsOn(wasmWasiUpstreamCommon)
+            kotlin {
+                srcDirs += [
+                    "$rootDir/savedstate/savedstate-compose/src/nonAndroidMain/kotlin",
+                ]
+                // Patched copy lives in src/wasmWasiMain/kotlin
+                exclude("**/LocalSavedStateRegistryOwner.nonAndroid.kt")
+            }
+            dependencies {
+                api("org.jetbrains.compose.runtime:runtime-wasm-wasi:9999.0.0-SNAPSHOT")
+                api("org.jetbrains.androidx.savedstate:savedstate-wasm-wasi:9999.0.0-SNAPSHOT")
+            }
+        }
     }
+}
+
+configurations.matching { it.name.startsWith("wasmWasi") }.all {
+    exclude group: "androidx.savedstate", module: "savedstate-compose"
+    exclude group: "androidx.savedstate", module: "savedstate"
+    exclude group: "androidx.compose.runtime", module: "runtime"
+    exclude group: "androidx.lifecycle", module: "lifecycle-common"
+    exclude group: "androidx.annotation", module: "annotation"
+    exclude group: "androidx.collection", module: "collection"
+    exclude group: "org.jetbrains.compose.runtime", module: "runtime"
+    exclude group: "org.jetbrains.androidx.savedstate", module: "savedstate"
+    exclude group: "org.jetbrains.androidx.lifecycle", module: "lifecycle-common"
 }
 
 androidx {

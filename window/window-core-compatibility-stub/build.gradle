@@ -35,6 +35,7 @@ androidXMultiplatform {
     mingwX64()
     js()
     wasmJs()
+    wasmWasi()
 
     defaultPlatform(PlatformIdentifier.ANDROID)
 
@@ -45,7 +46,23 @@ androidXMultiplatform {
                 api("androidx.window:window-core:$version")
             }
         }
+        // wasmWasi has no published variant. Pull upstream commonMain into an
+        // intermediate sourceset (no nonJvmMain or actuals exist for this
+        // module, so wasmWasiMain itself stays empty).
+        wasmWasiUpstreamCommon {
+            dependsOn(commonMain)
+            kotlin.srcDirs += [
+                "$rootDir/window/window-core/src/commonMain/kotlin",
+            ]
+        }
+        wasmWasiMain {
+            dependsOn(wasmWasiUpstreamCommon)
+        }
     }
+}
+
+configurations.matching { it.name.startsWith("wasmWasi") }.all {
+    exclude group: "androidx.window", module: "window-core"
 }
 
 androidx {

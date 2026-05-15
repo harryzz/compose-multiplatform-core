@@ -31,6 +31,7 @@ androidXMultiplatform {
     mingwX64()
     tvos()
     wasmJs()
+    wasmWasi()
     watchos()
 
     defaultPlatform(PlatformIdentifier.JVM)
@@ -42,7 +43,32 @@ androidXMultiplatform {
                 api("androidx.annotation:annotation:$version")
             }
         }
+        // wasmWasi has no published variant — build from local source by pulling
+        // annotation/annotation's sources via an intermediate sourceset so the
+        // expect (commonMain) and actual (nonJvm) live in separate sets.
+        wasmWasiUpstreamCommon {
+            dependsOn(commonMain)
+            kotlin.srcDirs += [
+                "$rootDir/annotation/annotation/src/commonMain/kotlin",
+            ]
+        }
+        wasmWasiMain {
+            // KGP emits a misleading "redundant dependsOn" warning here, but
+            // without this edge wasmWasiMain can't see wasmWasiUpstreamCommon's
+            // upstream commonMain expects.
+            dependsOn(wasmWasiUpstreamCommon)
+            kotlin.srcDirs += [
+                "$rootDir/annotation/annotation/src/nonJvmMain/kotlin",
+            ]
+        }
     }
+}
+
+// commonMain `api(androidx.annotation:annotation)` propagates to wasmWasi,
+// but no wasmWasi variant is published. Exclude it from wasmWasi configurations
+// since we build the equivalent from source via srcDirs above.
+configurations.matching { it.name.startsWith("wasmWasi") }.all {
+    exclude group: "androidx.annotation", module: "annotation"
 }
 
 androidx {

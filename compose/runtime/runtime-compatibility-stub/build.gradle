@@ -37,6 +37,7 @@ androidXMultiplatform {
     watchos()
     js()
     wasmJs()
+    wasmWasi()
 
     defaultPlatform(PlatformIdentifier.ANDROID)
 
@@ -47,7 +48,53 @@ androidXMultiplatform {
                 api("androidx.compose.runtime:runtime:$version")
             }
         }
+        // wasmWasiUpstreamCommon holds expects only (commonMain) — must be a
+        // distinct fragment from any actual-providing source set.
+        wasmWasiUpstreamCommon {
+            dependsOn(commonMain)
+            kotlin.srcDirs += [
+                "$rootDir/compose/runtime/runtime/src/commonMain/kotlin",
+                // runtime-annotation isn't a registered Gradle project (only on
+                // disk); pull its commonMain straight into our intermediate.
+                "$rootDir/compose/runtime/runtime-annotation/src/commonMain/kotlin",
+            ]
+            dependencies {
+                api(libs.kotlinCoroutinesCore)
+            }
+            languageSettings {
+                optIn("kotlin.contracts.ExperimentalContracts")
+                optIn("kotlin.experimental.ExperimentalNativeApi")
+            }
+        }
+        wasmWasiMain {
+            dependsOn(wasmWasiUpstreamCommon)
+            kotlin {
+                srcDirs += [
+                    "$rootDir/compose/runtime/runtime/src/nonAndroidMain/kotlin",
+                    "$rootDir/compose/runtime/runtime/src/nonJvmMain/kotlin",
+                    "$rootDir/compose/runtime/runtime/src/webMain/kotlin",
+                ]
+                // Patched *.wasmWasi.kt copies live in src/wasmWasiMain/kotlin.
+                exclude("**/SnapshotStateSet.nonAndroid.kt")
+                exclude("**/SnapshotStateList.nonAndroid.kt")
+            }
+            dependencies {
+                api("org.jetbrains.compose.annotation-internal:annotation-wasm-wasi:9999.0.0-SNAPSHOT")
+                implementation("org.jetbrains.compose.collection-internal:collection-wasm-wasi:9999.0.0-SNAPSHOT")
+                implementation(libs.atomicFu)
+            }
+            languageSettings {
+                optIn("kotlin.contracts.ExperimentalContracts")
+                optIn("kotlin.experimental.ExperimentalNativeApi")
+            }
+        }
     }
+}
+
+configurations.matching { it.name.startsWith("wasmWasi") }.all {
+    exclude group: "androidx.compose.runtime", module: "runtime"
+    exclude group: "androidx.annotation", module: "annotation"
+    exclude group: "androidx.collection", module: "collection"
 }
 
 androidx {

@@ -22,42 +22,37 @@
  * modifying its settings.
  */
 
-import androidx.build.LibraryType
+import androidx.build.SoftwareType
 import androidx.build.PlatformIdentifier
 import org.jetbrains.androidx.build.JetBrainsAndroidXPlugin
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 
 plugins {
     id("AndroidXPlugin")
-    id("com.android.library")
     id("JetBrainsAndroidXPlugin")
 }
 
-JetBrainsAndroidXPlugin.applyAndConfigure(project)
+// JetBrainsAndroidXPlugin static helper removed in this fork — apply via id() above.
 
 androidXMultiplatform {
-    android()
+    androidLibrary {
+        namespace = "androidx.graphics.shapes"
+    }
     desktop()
     mac()
     linux()
     ios()
+    tvos()
+    watchos()
+    mingwX64()
     js()
-    wasm()
+    wasmJs()
+    wasmWasi()
 
     defaultPlatform(PlatformIdentifier.ANDROID)
 }
 
 kotlin {
-    js {
-        browser()
-    }
-    wasmJs()
-
-    watchosArm64()
-    watchosArm32()
-    watchosSimulatorArm64()
-    tvosArm64()
-    tvosSimulatorArm64()
 
     sourceSets {
         configureEach {
@@ -133,34 +128,8 @@ kotlin {
             dependsOn(nonJvmTest)
         }
 
-        jsMain {
-            dependsOn(nonJvmMain)
-            dependencies {
-                implementation(libs.kotlinStdlibJs)
-            }
-        }
-
-        jsTest {
-            dependencies {
-                implementation(libs.kotlinStdlibJs)
-                implementation(libs.kotlinTestJs)
-            }
-        }
-
-        wasmJsMain {
-            dependsOn(nonJvmMain)
-            dependencies {
-                implementation(libs.kotlinStdlibWasm)
-            }
-        }
-
-        wasmJsTest {
-            dependencies {
-                implementation(libs.kotlinStdlibWasm)
-                implementation(libs.kotlinTestWasm)
-            }
-        }
-
+        // jsMain/wasmJsMain/wasmJsTest stdlib pins removed — current libs.versions.toml
+        // doesn't expose the per-target stdlib aliases the older fork used.
         targets.configureEach { target ->
             if (target.platformType == KotlinPlatformType.native) {
                 target.compilations["main"].defaultSourceSet.dependsOn(nativeMain)
@@ -170,15 +139,24 @@ kotlin {
     }
 }
 
-android {
-    namespace "androidx.graphics.shapes"
-}
-
 androidx {
     name = "Graphics Shapes"
-    type = LibraryType.PUBLISHED_LIBRARY
+    type = SoftwareType.PUBLISHED_LIBRARY_ONLY_USED_BY_KOTLIN_CONSUMERS
     mavenVersion = LibraryVersions.GRAPHICS_SHAPES
     inceptionYear = "2022"
     description = "create and render rounded polygonal shapes"
     legacyDisableKotlinStrictApiMode = true
+}
+
+configurations.matching { it.name.startsWith("wasmWasi") }.all {
+    exclude group: "androidx.collection", module: "collection"
+    exclude group: "androidx.annotation", module: "annotation"
+    resolutionStrategy.dependencySubstitution {
+        substitute(module("org.jetbrains.compose.collection-internal:collection")).using(
+            module("org.jetbrains.compose.collection-internal:collection:9999.0.0-SNAPSHOT")
+        )
+        substitute(module("org.jetbrains.compose.annotation-internal:annotation")).using(
+            module("org.jetbrains.compose.annotation-internal:annotation:9999.0.0-SNAPSHOT")
+        )
+    }
 }

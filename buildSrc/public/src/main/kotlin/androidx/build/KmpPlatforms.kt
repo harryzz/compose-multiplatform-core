@@ -59,6 +59,7 @@ enum class PlatformIdentifier(val id: String, val group: PlatformGroup) {
     JVM_STUBS("jvmStubs", PlatformGroup.JVM),
     JS("js", PlatformGroup.JS),
     WASM_JS("wasmJs", PlatformGroup.WASM),
+    WASM_WASI("wasmWasi", PlatformGroup.WASM),
     ANDROID("android", PlatformGroup.JVM),
     ANDROID_NATIVE_ARM32("androidNativeArm32", PlatformGroup.ANDROID_NATIVE),
     ANDROID_NATIVE_ARM64("androidNativeArm64", PlatformGroup.ANDROID_NATIVE),
@@ -143,3 +144,5 @@ fun Project.enableJvm(): Boolean = enabledKmpPlatforms.contains(PlatformGroup.JV
 fun Project.enableDesktop(): Boolean = enabledKmpPlatforms.contains(PlatformGroup.DESKTOP)
 
 fun Project.enableWasmJs(): Boolean = enabledKmpPlatforms.contains(PlatformGroup.WASM)
+
+fun Project.enableWasmWasi(): Boolean = enabledKmpPlatforms.contains(PlatformGroup.WASM)

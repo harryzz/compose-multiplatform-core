@@ -44,6 +44,7 @@ androidXMultiplatform {
     ios()
     js()
     wasmJs()
+    wasmWasi()
 
     defaultPlatform(PlatformIdentifier.ANDROID)
 
@@ -123,4 +124,18 @@ androidx {
     description = "Compose classes for simple units"
     legacyDisableKotlinStrictApiMode = true
     samples(project(":compose:ui:ui-unit:ui-unit-samples"))
+}
+
+configurations.matching { it.name.startsWith("wasmWasi") }.all {
+    exclude group: "androidx.collection", module: "collection"
+    exclude group: "androidx.collection", module: "collection-ktx"
+    exclude group: "androidx.annotation", module: "annotation"
+    resolutionStrategy.dependencySubstitution {
+        substitute(module("org.jetbrains.compose.collection-internal:collection")).using(
+            module("org.jetbrains.compose.collection-internal:collection:9999.0.0-SNAPSHOT")
+        )
+        substitute(module("org.jetbrains.compose.annotation-internal:annotation")).using(
+            module("org.jetbrains.compose.annotation-internal:annotation:9999.0.0-SNAPSHOT")
+        )
+    }
 }

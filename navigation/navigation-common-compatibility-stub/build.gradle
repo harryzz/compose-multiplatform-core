@@ -20,6 +20,7 @@ import androidx.build.SoftwareType
 plugins {
     id("AndroidXPlugin")
     id("JetBrainsAndroidXPlugin")
+    alias(libs.plugins.kotlinSerialization)
 }
 
 androidXMultiplatform {
@@ -34,6 +35,7 @@ androidXMultiplatform {
     ios()
     js()
     wasmJs()
+    wasmWasi()
 
     defaultPlatform(PlatformIdentifier.ANDROID)
 
@@ -52,7 +54,61 @@ androidXMultiplatform {
                 api("org.jetbrains.androidx.savedstate:savedstate:1.4.0")
             }
         }
+        wasmWasiUpstreamCommon {
+            dependsOn(commonMain)
+            kotlin.srcDirs += [
+                "$rootDir/navigation/navigation-common/src/commonMain/kotlin",
+            ]
+            dependencies {
+                api(libs.kotlinCoroutinesCore)
+                api(libs.kotlinSerializationCore)
+            }
+            languageSettings {
+                optIn("kotlin.contracts.ExperimentalContracts")
+            }
+        }
+        wasmWasiMain {
+            dependsOn(wasmWasiUpstreamCommon)
+            kotlin {
+                srcDirs += [
+                    "$rootDir/navigation/navigation-common/src/nonAndroidMain/kotlin",
+                    "$rootDir/navigation/navigation-common/src/webMain/kotlin",
+                ]
+                // Patched copies in src/wasmWasiMain/kotlin strip JVM annotations
+                // (@Jvm*, @Throws) that Kotlin 2.4 forbids outside commonMain.
+                exclude("**/*.nonAndroid.kt")
+                exclude("**/internal/UriCodec.kt")
+            }
+            dependencies {
+                api("org.jetbrains.compose.annotation-internal:annotation-wasm-wasi:9999.0.0-SNAPSHOT")
+                implementation("org.jetbrains.compose.collection-internal:collection-wasm-wasi:9999.0.0-SNAPSHOT")
+                api("org.jetbrains.androidx.lifecycle:lifecycle-common-wasm-wasi:9999.0.0-SNAPSHOT")
+                api("org.jetbrains.androidx.lifecycle:lifecycle-runtime-wasm-wasi:9999.0.0-SNAPSHOT")
+                api("org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-wasm-wasi:9999.0.0-SNAPSHOT")
+                api("org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-savedstate-wasm-wasi:9999.0.0-SNAPSHOT")
+                api("org.jetbrains.androidx.savedstate:savedstate-wasm-wasi:9999.0.0-SNAPSHOT")
+            }
+            languageSettings {
+                optIn("kotlin.contracts.ExperimentalContracts")
+            }
+        }
     }
+}
+
+configurations.matching { it.name.startsWith("wasmWasi") }.all {
+    exclude group: "androidx.navigation", module: "navigation-common"
+    exclude group: "androidx.annotation", module: "annotation"
+    exclude group: "androidx.collection", module: "collection"
+    exclude group: "androidx.lifecycle", module: "lifecycle-common"
+    exclude group: "androidx.lifecycle", module: "lifecycle-runtime"
+    exclude group: "androidx.lifecycle", module: "lifecycle-viewmodel"
+    exclude group: "androidx.lifecycle", module: "lifecycle-viewmodel-savedstate"
+    exclude group: "androidx.savedstate", module: "savedstate"
+    exclude group: "org.jetbrains.androidx.lifecycle", module: "lifecycle-common"
+    exclude group: "org.jetbrains.androidx.lifecycle", module: "lifecycle-runtime"
+    exclude group: "org.jetbrains.androidx.lifecycle", module: "lifecycle-viewmodel"
+    exclude group: "org.jetbrains.androidx.lifecycle", module: "lifecycle-viewmodel-savedstate"
+    exclude group: "org.jetbrains.androidx.savedstate", module: "savedstate"
 }
 
 androidx {

@@ -45,6 +45,7 @@ androidXMultiplatform {
     ios()
     js()
     wasmJs()
+    wasmWasi()
 
     defaultPlatform(PlatformIdentifier.ANDROID)
 
@@ -159,6 +160,25 @@ androidXMultiplatform {
 
         nativeTest {
             dependsOn(nonJvmTest)
+        }
+
+        wasmWasiMain {
+            dependsOn(nonJvmMain)
+            kotlin {
+                srcDirs += [
+                    // Pull webMain srcs (CalendarLocale typealias). Exclude
+                    // PlatformDateFormat.web.kt — uses kotlin.js. Our wasi
+                    // actual lives in src/wasmWasiMain/kotlin.
+                    "$rootDir/compose/material3/material3/src/webMain/kotlin",
+                ]
+                exclude("**/PlatformDateFormat.web.kt")
+            }
+            dependencies {
+                implementation("org.jetbrains.compose.collection-internal:collection-wasm-wasi:9999.0.0-SNAPSHOT")
+                api("org.jetbrains.skiko:skiko-wasm-wasi:0.0.0-SNAPSHOT")
+                api("org.jetbrains.kotlinx:kotlinx-datetime:0.8.0")
+                api("androidx.graphics:graphics-shapes-wasm-wasi:1.1.0-rc01")
+            }
         }
 
         darwinMain {
@@ -324,4 +344,103 @@ tasks.register("updateTranslations", UpdateTranslationsTask.class) {
             "si", "sk", "sl", "sq", "sr", "sv", "sw", "ta", "te", "th", "tl", "tr", "uk", "ur",
             "uz", "vi", "zh_CN", "zh_HK", "zh_TW", "zu"
     ]
+}
+
+tasks.matching { it.name == "compileKotlinWasmWasi" }.configureEach { task ->
+    task.compilerOptions {
+        freeCompilerArgs.add("-Xexpect-actual-classes")
+        allWarningsAsErrors.set(false)
+        suppressWarnings.set(true)
+    }
+}
+
+configurations.matching { it.name.startsWith("wasmWasi") }.all {
+    exclude group: "androidx.collection", module: "collection"
+    exclude group: "androidx.collection", module: "collection-ktx"
+    exclude group: "androidx.annotation", module: "annotation"
+    exclude group: "androidx.graphics", module: "graphics-shapes"
+    exclude group: "androidx.compose.ui", module: "ui"
+    exclude group: "androidx.compose.ui", module: "ui-graphics"
+    exclude group: "androidx.compose.ui", module: "ui-text"
+    exclude group: "androidx.compose.ui", module: "ui-unit"
+    exclude group: "androidx.compose.ui", module: "ui-util"
+    exclude group: "androidx.compose.runtime", module: "runtime"
+    exclude group: "androidx.compose.runtime", module: "runtime-saveable"
+    exclude group: "androidx.compose.runtime", module: "runtime-retain"
+    exclude group: "androidx.compose.animation", module: "animation"
+    exclude group: "androidx.compose.animation", module: "animation-core"
+    exclude group: "androidx.compose.foundation", module: "foundation"
+    exclude group: "androidx.compose.foundation", module: "foundation-layout"
+    exclude group: "androidx.compose.material", module: "material-ripple"
+    exclude group: "androidx.lifecycle", module: "lifecycle-runtime-compose"
+    exclude group: "androidx.lifecycle", module: "lifecycle-runtime"
+    exclude group: "androidx.lifecycle", module: "lifecycle-common"
+    exclude group: "androidx.lifecycle", module: "lifecycle-common-java8"
+    exclude group: "androidx.lifecycle", module: "lifecycle-viewmodel"
+    exclude group: "androidx.lifecycle", module: "lifecycle-viewmodel-savedstate"
+    exclude group: "androidx.lifecycle", module: "lifecycle-viewmodel-compose"
+    exclude group: "androidx.savedstate", module: "savedstate"
+    exclude group: "androidx.savedstate", module: "savedstate-compose"
+    exclude group: "androidx.navigationevent", module: "navigationevent-compose"
+    exclude group: "androidx.window", module: "window"
+    exclude group: "androidx.window", module: "window-core"
+    exclude group: "androidx.activity", module: "activity"
+    exclude group: "androidx.activity", module: "activity-compose"
+    exclude group: "androidx.activity", module: "activity-ktx"
+    exclude group: "androidx.fragment", module: "fragment"
+    exclude group: "androidx.core", module: "core"
+    exclude group: "androidx.appcompat", module: "appcompat"
+    exclude group: "androidx.autofill", module: "autofill"
+    exclude group: "androidx.customview", module: "customview-poolingcontainer"
+    exclude group: "androidx.emoji2", module: "emoji2"
+    exclude group: "androidx.profileinstaller", module: "profileinstaller"
+    exclude group: "androidx.transition", module: "transition"
+    exclude group: "org.jetbrains.compose.runtime", module: "runtime"
+    resolutionStrategy.dependencySubstitution {
+        substitute(module("org.jetbrains.compose.collection-internal:collection")).using(
+            module("org.jetbrains.compose.collection-internal:collection:9999.0.0-SNAPSHOT")
+        )
+        substitute(module("org.jetbrains.compose.annotation-internal:annotation")).using(
+            module("org.jetbrains.compose.annotation-internal:annotation:9999.0.0-SNAPSHOT")
+        )
+        substitute(module("org.jetbrains.skiko:skiko")).using(
+            module("org.jetbrains.skiko:skiko-wasm-wasi:0.0.0-SNAPSHOT")
+        )
+        substitute(module("org.jetbrains.androidx.lifecycle:lifecycle-common")).using(
+            module("org.jetbrains.androidx.lifecycle:lifecycle-common:9999.0.0-SNAPSHOT")
+        )
+        substitute(module("org.jetbrains.androidx.lifecycle:lifecycle-runtime")).using(
+            module("org.jetbrains.androidx.lifecycle:lifecycle-runtime:9999.0.0-SNAPSHOT")
+        )
+        substitute(module("org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose")).using(
+            module("org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose-wasm-wasi:9999.0.0-SNAPSHOT")
+        )
+        substitute(module("org.jetbrains.androidx.lifecycle:lifecycle-viewmodel")).using(
+            module("org.jetbrains.androidx.lifecycle:lifecycle-viewmodel:9999.0.0-SNAPSHOT")
+        )
+        substitute(module("org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-savedstate")).using(
+            module("org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-savedstate:9999.0.0-SNAPSHOT")
+        )
+        substitute(module("org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose")).using(
+            module("org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose-wasm-wasi:9999.0.0-SNAPSHOT")
+        )
+        substitute(module("org.jetbrains.androidx.savedstate:savedstate")).using(
+            module("org.jetbrains.androidx.savedstate:savedstate:9999.0.0-SNAPSHOT")
+        )
+        substitute(module("org.jetbrains.androidx.savedstate:savedstate-compose")).using(
+            module("org.jetbrains.androidx.savedstate:savedstate-compose-wasm-wasi:9999.0.0-SNAPSHOT")
+        )
+        substitute(module("org.jetbrains.androidx.navigationevent:navigationevent-compose")).using(
+            module("org.jetbrains.androidx.navigationevent:navigationevent-compose-wasm-wasi:9999.0.0-SNAPSHOT")
+        )
+        substitute(module("androidx.navigationevent:navigationevent-compose")).using(
+            module("org.jetbrains.androidx.navigationevent:navigationevent-compose-wasm-wasi:9999.0.0-SNAPSHOT")
+        )
+        substitute(module("androidx.lifecycle:lifecycle-viewmodel-compose")).using(
+            module("org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose-wasm-wasi:9999.0.0-SNAPSHOT")
+        )
+        substitute(module("androidx.compose.runtime:runtime-retain")).using(
+            module("androidx.compose.runtime:runtime-retain-wasm-wasi:1.12.0-alpha02")
+        )
+    }
 }

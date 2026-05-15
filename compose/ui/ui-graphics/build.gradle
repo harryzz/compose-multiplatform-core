@@ -48,6 +48,7 @@ androidXMultiplatform {
     ios()
     js()
     wasmJs()
+    wasmWasi()
 
     defaultPlatform(PlatformIdentifier.ANDROID)
 
@@ -164,11 +165,45 @@ androidXMultiplatform {
                 implementation(libs.skikoJsWasmRuntime)
             }
         }
+
+        wasmWasiMain {
+            // wasmWasi inherits skikoMain via nonJvmMain + skikoExcludingWebMain
+            // (mirrors nativeMain pattern). skikoExcludingWebMain provides the
+            // `actual fun Image.toBitmap()` whose expect is in skikoMain — they
+            // must live in different source sets.
+            dependsOn(nonJvmMain)
+            dependsOn(skikoExcludingWebMain)
+            dependencies {
+                // skiko-wasm-wasi provides org.jetbrains.skia.* (Canvas/Paint/
+                // Path/Shader/RenderNode/etc.) that skikoMain actuals reference.
+                api("org.jetbrains.skiko:skiko-wasm-wasi:0.0.0-SNAPSHOT")
+            }
+        }
     }
 }
 
 dependencies {
     lintPublish(project(":compose:ui:ui-graphics-lint"))
+}
+
+configurations.matching { it.name.startsWith("wasmWasi") }.all {
+    exclude group: "androidx.collection", module: "collection"
+    exclude group: "androidx.collection", module: "collection-ktx"
+    exclude group: "androidx.annotation", module: "annotation"
+    exclude group: "androidx.graphics", module: "graphics-path"
+    resolutionStrategy.dependencySubstitution {
+        substitute(module("org.jetbrains.compose.collection-internal:collection")).using(
+            module("org.jetbrains.compose.collection-internal:collection:9999.0.0-SNAPSHOT")
+        )
+        substitute(module("org.jetbrains.compose.annotation-internal:annotation")).using(
+            module("org.jetbrains.compose.annotation-internal:annotation:9999.0.0-SNAPSHOT")
+        )
+        // Upstream skikoMain pins skiko:0.148.0 (no wasi variant); swap to our
+        // local skiko-wasm-wasi fork build.
+        substitute(module("org.jetbrains.skiko:skiko")).using(
+            module("org.jetbrains.skiko:skiko-wasm-wasi:0.0.0-SNAPSHOT")
+        )
+    }
 }
 
 androidx {

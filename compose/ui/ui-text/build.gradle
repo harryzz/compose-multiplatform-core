@@ -48,6 +48,7 @@ androidXMultiplatform {
     ios()
     js()
     wasmJs()
+    wasmWasi()
 
     defaultPlatform(PlatformIdentifier.ANDROID)
 
@@ -198,6 +199,13 @@ androidXMultiplatform {
             }
         }
 
+        wasmWasiMain {
+            dependsOn(nonJvmMain)
+            dependencies {
+                api("org.jetbrains.skiko:skiko-wasm-wasi:0.0.0-SNAPSHOT")
+            }
+        }
+
         // TODO: Align it with AOSP or make explicit
         configureEach {
             languageSettings.optIn("androidx.compose.ui.text.ExperimentalTextApi")
@@ -224,5 +232,26 @@ afterEvaluate {
     // (https://github.com/JetBrains/compose-multiplatform-core/pull/918)
     tasks.withType(Test) { t ->
         t.jvmArgs += ["--add-opens=java.desktop/sun.font=ALL-UNNAMED"]
+    }
+}
+
+configurations.matching { it.name.startsWith("wasmWasi") }.all {
+    exclude group: "androidx.collection", module: "collection"
+    exclude group: "androidx.collection", module: "collection-ktx"
+    exclude group: "androidx.annotation", module: "annotation"
+    // compose-runtime arrives via project(":compose:runtime:runtime") in
+    // commonMain (transitively through ui-graphics) — block the m2 copy that
+    // arrives transitively from ui-graphics-wasm-wasi pom.
+    exclude group: "org.jetbrains.compose.runtime", module: "runtime"
+    resolutionStrategy.dependencySubstitution {
+        substitute(module("org.jetbrains.compose.collection-internal:collection")).using(
+            module("org.jetbrains.compose.collection-internal:collection:9999.0.0-SNAPSHOT")
+        )
+        substitute(module("org.jetbrains.compose.annotation-internal:annotation")).using(
+            module("org.jetbrains.compose.annotation-internal:annotation:9999.0.0-SNAPSHOT")
+        )
+        substitute(module("org.jetbrains.skiko:skiko")).using(
+            module("org.jetbrains.skiko:skiko-wasm-wasi:0.0.0-SNAPSHOT")
+        )
     }
 }

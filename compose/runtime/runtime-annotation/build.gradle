@@ -41,6 +41,7 @@ androidXMultiplatform {
     tvos()
     js()
     wasmJs()
+    wasmWasi()
 
     defaultPlatform(PlatformIdentifier.JVM)
 }
