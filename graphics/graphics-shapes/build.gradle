@@ -152,6 +152,20 @@ configurations.matching { it.name.startsWith("wasmWasi") }.all {
     exclude group: "androidx.collection", module: "collection"
     exclude group: "androidx.annotation", module: "annotation"
     resolutionStrategy.dependencySubstitution {
+        // commonMain declares project(":collection:collection") and
+        // project(":annotation:annotation"). For the wasmWasi target we
+        // want the published m2 klibs instead — otherwise the project
+        // build output AND the m2 klib both land on the compile
+        // classpath and the KLIB loader rejects the duplicate
+        // unique_name. substitute(module(...)) does NOT catch a
+        // project(...) dependency, so the project form must be
+        // substituted explicitly.
+        substitute(project(":collection:collection")).using(
+            module("org.jetbrains.compose.collection-internal:collection:9999.0.0-SNAPSHOT")
+        )
+        substitute(project(":annotation:annotation")).using(
+            module("org.jetbrains.compose.annotation-internal:annotation:9999.0.0-SNAPSHOT")
+        )
         substitute(module("org.jetbrains.compose.collection-internal:collection")).using(
             module("org.jetbrains.compose.collection-internal:collection:9999.0.0-SNAPSHOT")
         )
