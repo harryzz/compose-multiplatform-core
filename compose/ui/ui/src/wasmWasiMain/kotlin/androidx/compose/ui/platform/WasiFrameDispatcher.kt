@@ -121,6 +121,31 @@ public class WasiFrameDispatcher : CoroutineDispatcher(), Delay {
      * New Runnables enqueued during execution will be picked up by the NEXT
      * flush, not this one.
      */
+    /**
+     * Task 64 — on-demand rendering support. Milliseconds from `now` until the
+     * next moment `flush()` would have work to do:
+     *   - `0` if there are already-queued runnables or a delayed task is due
+     *     (the host should render the next frame immediately),
+     *   - else the smallest remaining delay over pending delayed tasks
+     *     (cursor blink, `withTimeout`, snackbar timeout, …),
+     *   - else [Long.MAX_VALUE] when fully idle (no timed wake pending).
+     *
+     * The frame-pacing export combines this with `ComposeScene.hasInvalidations()`
+     * so a static scene with a pending `delay()` still gets woken on time
+     * (`flush()` is the only heartbeat for timed resumes — see the class kdoc).
+     */
+    public fun nextDeadlineMillis(now: Long): Long {
+        if (queue.isNotEmpty() || running.isNotEmpty()) return 0L
+        var min = Long.MAX_VALUE
+        for (t in delayed) {
+            if (t.runnable == null) continue
+            val remaining = t.deadlineMillis - now
+            if (remaining <= 0L) return 0L
+            if (remaining < min) min = remaining
+        }
+        return min
+    }
+
     public fun flush() {
         // 1. Materialize any due delayed tasks into the main queue.
         if (delayed.isNotEmpty()) {
