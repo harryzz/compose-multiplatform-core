@@ -1,7 +1,7 @@
 package androidx.compose.ui.platform
 
 import androidx.compose.ui.text.AnnotatedString
-import org.jetbrains.skiko.wasi.wit.Clipboard as WitClipboard
+import org.jetbrains.skiko.wasi.shell.Clipboard as WitClipboard
 
 // ClipEntry stores plain text on wasmWasi (our wasi:android-clipboard WIT only
 // exposes text). clipMetadata isn't synthesizable because skikoMain marks

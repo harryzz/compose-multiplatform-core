@@ -176,7 +176,8 @@ public class WasiFrameDispatcher : CoroutineDispatcher(), Delay {
                 // Surface the error to host log so we can see if a queued
                 // task is throwing (would otherwise be swallowed silently
                 // by the coroutine machinery).
-                org.jetbrains.skiko.wasi.wit.Canvas.Import.logMessage(
+                org.jetbrains.skiko.wasi.shell.Logging.Import.log(
+                    org.jetbrains.skiko.wasi.shell.Logging.Level.WARN, "compose-ui",
                     "WasiFrameDispatcher task threw: ${t::class.simpleName}: ${t.message}"
                 )
             }

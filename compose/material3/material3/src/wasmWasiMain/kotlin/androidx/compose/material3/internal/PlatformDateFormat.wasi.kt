@@ -24,7 +24,7 @@ import kotlinx.datetime.Month
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
-import org.jetbrains.skiko.wasi.wit.Locale as WitLocale
+import org.jetbrains.skiko.wasi.shell.Locale as WitLocale
 
 internal actual class PlatformDateFormat actual constructor(private val locale: CalendarLocale) {
 
@@ -107,7 +107,7 @@ internal actual class PlatformDateFormat actual constructor(private val locale: 
 
     actual fun is24HourFormat(): Boolean =
         try {
-            WitLocale.Import.is24HourFormat()
+            WitLocale.Import.isTwentyFourHourFormat()
         } catch (_: Throwable) {
             true
         }

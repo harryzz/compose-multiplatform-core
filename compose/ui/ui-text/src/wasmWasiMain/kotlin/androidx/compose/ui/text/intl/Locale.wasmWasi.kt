@@ -7,7 +7,7 @@
 
 package androidx.compose.ui.text.intl
 
-import org.jetbrains.skiko.wasi.wit.Locale as WitLocale
+import org.jetbrains.skiko.wasi.shell.Locale as WitLocale
 
 actual class Locale {
     private val tag: String
